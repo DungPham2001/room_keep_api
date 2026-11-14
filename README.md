@@ -11,6 +11,7 @@ npm run db:init          # tạo database, collection, index (chạy lại an to
 npm run dev              # http://localhost:4000  -> /health, /v1
 npm test                 # replica set in-memory (dùng mongod local nếu có)
 npm run docs             # sinh lại mục 7 (CRUD) của docs/API-cho-FE.md sau khi sửa schema
+npm run docs:examples    # chạy API trên database tạm, ghi request/response thật vào mục 8
 ```
 
 ## Kết nối MongoDB

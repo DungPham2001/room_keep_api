@@ -11,19 +11,19 @@ const { limiter } = require('../middleware/rateLimit');
 const text = {
   vi: {
     title: 'Xóa tài khoản RoomKeep',
-    intro: 'Nhập email và mật khẩu của tài khoản để xóa vĩnh viễn tài khoản và dữ liệu trên máy chủ. Nếu bạn là chủ trọ, toàn bộ dữ liệu nhà trọ (phòng, khách thuê, hợp đồng, chỉ số, kỳ thu...) và quyền truy cập của người quản lý cũng bị xóa. Thao tác này không thể hoàn tác. Dữ liệu chỉ lưu trên điện thoại không bị ảnh hưởng.',
+    intro: 'Nhập email (hoặc số điện thoại) và mật khẩu của tài khoản để xóa vĩnh viễn tài khoản và dữ liệu trên máy chủ. Nếu bạn là chủ trọ, toàn bộ dữ liệu nhà trọ (phòng, khách thuê, hợp đồng, chỉ số, kỳ thu...) và quyền truy cập của người quản lý cũng bị xóa. Thao tác này không thể hoàn tác. Dữ liệu chỉ lưu trên điện thoại không bị ảnh hưởng.',
     alt: 'Bạn cũng có thể xóa ngay trong ứng dụng: Cài đặt > Tài khoản > Xóa tài khoản.',
-    email: 'Email', password: 'Mật khẩu', confirm: 'Tôi hiểu thao tác này không thể hoàn tác', submit: 'Xóa vĩnh viễn',
+    email: 'Email hoặc số điện thoại', password: 'Mật khẩu', confirm: 'Tôi hiểu thao tác này không thể hoàn tác', submit: 'Xóa vĩnh viễn',
     done: 'Tài khoản và dữ liệu trên máy chủ đã được xóa.',
-    bad: 'Email hoặc mật khẩu không đúng.', locked: 'Bạn thử quá nhiều lần, vui lòng thử lại sau.', confirmMissing: 'Hãy đánh dấu xác nhận trước khi xóa.', error: 'Không thể xử lý yêu cầu, vui lòng thử lại sau.',
+    bad: 'Email/số điện thoại hoặc mật khẩu không đúng.', locked: 'Bạn thử quá nhiều lần, vui lòng thử lại sau.', confirmMissing: 'Hãy đánh dấu xác nhận trước khi xóa.', error: 'Không thể xử lý yêu cầu, vui lòng thử lại sau.',
   },
   en: {
     title: 'Delete your RoomKeep account',
-    intro: 'Enter the email and password of the account to permanently delete the account and its data on the server. If you are the owner, all property data (rooms, tenants, contracts, readings, billing...) and managers\' access are deleted too. This cannot be undone. Data stored only on your phone is not affected.',
+    intro: 'Enter the email (or phone number) and password of the account to permanently delete the account and its data on the server. If you are the owner, all property data (rooms, tenants, contracts, readings, billing...) and managers\' access are deleted too. This cannot be undone. Data stored only on your phone is not affected.',
     alt: 'You can also delete it in the app: Settings > Account > Delete account.',
-    email: 'Email', password: 'Password', confirm: 'I understand this cannot be undone', submit: 'Delete permanently',
+    email: 'Email or phone number', password: 'Password', confirm: 'I understand this cannot be undone', submit: 'Delete permanently',
     done: 'The account and its data on the server have been deleted.',
-    bad: 'Incorrect email or password.', locked: 'Too many attempts, please try again later.', confirmMissing: 'Please tick the confirmation first.', error: 'The request could not be processed, please try again later.',
+    bad: 'Incorrect email/phone number or password.', locked: 'Too many attempts, please try again later.', confirmMissing: 'Please tick the confirmation first.', error: 'The request could not be processed, please try again later.',
   },
 };
 
@@ -34,7 +34,7 @@ function page(lang, { message = '', ok = false } = {}) {
   const other = lang === 'vi' ? '<a href="?lang=en">English</a>' : '<a href="?lang=vi">Tiếng Việt</a>';
   const form = ok ? '' : `
     <form method="post" action="/account/delete?lang=${lang}">
-      <label>${t.email}<input type="email" name="email" required autocomplete="email"></label>
+      <label>${t.email}<input type="text" name="email" required autocomplete="username"></label>
       <label>${t.password}<input type="password" name="password" required autocomplete="current-password"></label>
       <label class="row"><input type="checkbox" name="confirm" value="yes" required> ${t.confirm}</label>
       <button type="submit">${t.submit}</button>
@@ -49,7 +49,7 @@ main{max-width:480px;margin:0 auto;padding:32px 16px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:20px}
 h1{font-size:22px;margin:0 0 12px}p{color:var(--muted)}
 label{display:block;margin:12px 0;font-weight:600}label.row{font-weight:400;display:flex;gap:8px;align-items:flex-start}
-input[type=email],input[type=password]{display:block;width:100%;box-sizing:border-box;margin-top:4px;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg);font:inherit}
+input[type=text],input[type=password]{display:block;width:100%;box-sizing:border-box;margin-top:4px;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg);font:inherit}
 button{margin-top:8px;width:100%;padding:12px;border:0;border-radius:8px;background:var(--accent);color:var(--bg);font:inherit;font-weight:700;cursor:pointer}
 .msg{padding:10px 12px;border-radius:8px;border:1px solid var(--line);margin:12px 0;color:var(--fg)}
 nav{margin-top:16px;font-size:14px}a{color:inherit}
@@ -70,7 +70,7 @@ router.post('/account/delete', limiter, express.urlencoded({ extended: false, li
   const t = text[lang];
   if (req.body?.confirm !== 'yes') return res.status(400).type('html').send(page(lang, { message: t.confirmMissing }));
   try {
-    await accounts.deleteByCredentials({ email: req.body.email, password: req.body.password });
+    await accounts.deleteByCredentials({ login: req.body.email, password: req.body.password });
     return res.type('html').send(page(lang, { message: t.done, ok: true }));
   } catch (err) {
     const status = err.status || 500;

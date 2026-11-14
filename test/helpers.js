@@ -39,11 +39,14 @@ const api = {
 const PASSWORD = 'matkhau123';
 
 /** Registers an owner; returns the response body (account, property, tokens, changes, rev). */
+/** A distinct, stable property phone per email (phones must be unique: they are the owner's login). */
+const phoneFor = (email) => `09${String(require('crypto').createHash('md5').update(email).digest().readUInt32BE(0) % 1e8).padStart(8, '0')}`;
+
 async function register(email = 'chu@example.com', extra = {}) {
   const res = await api.post('auth/register', {
     account: { email, password: PASSWORD, displayName: 'Chủ trọ' },
     acceptTerms: true,
-    property: { name: 'Nhà trọ Hoa Sen', address: '12 Lê Lợi', phone: '0901234567' },
+    property: { name: 'Nhà trọ Hoa Sen', address: '12 Lê Lợi', phone: phoneFor(email) },
     deviceName: 'Pixel 8',
     ...extra,
   });
@@ -57,4 +60,4 @@ async function login(email, password = PASSWORD, deviceName = 'Phone 2') {
   return res.body;
 }
 
-module.exports = { start, stop, reset, api, app, register, login, PASSWORD };
+module.exports = { start, stop, reset, api, app, register, login, PASSWORD, phoneFor };

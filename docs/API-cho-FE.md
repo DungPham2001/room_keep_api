@@ -9,7 +9,7 @@
 | **Định dạng** | Chỉ HTTPS, JSON UTF-8. Ngày `yyyy-MM-dd`, kỳ `yyyy-MM`, thời điểm ISO 8601 UTC. Tiền là **số nguyên đồng** |
 | **Đăng nhập** | `Authorization: Bearer <accessToken>` ở mọi endpoint có 🔒 |
 
-**Mục lục:** [0. Tóm tắt endpoint](#0-tóm-tắt-endpoint) · [1. Quy ước chung](#1-quy-ước-chung) · [2. Tài khoản và phiên](#2-tài-khoản-và-phiên) · [3. Mời quản lý](#3--mời-quản-lý-và-thành-viên-chủ-trọ) · [4. Đồng bộ](#4--đồng-bộ) · [5. Luồng xử lý trong app](#5-luồng-xử-lý-trong-app) · [6. Giới hạn](#6-giới-hạn) · [7. CRUD từng phần](#7--crud-từng-phần)
+**Mục lục:** [0. Tóm tắt endpoint](#0-tóm-tắt-endpoint) · [1. Quy ước chung](#1-quy-ước-chung) · [2. Tài khoản và phiên](#2-tài-khoản-và-phiên) · [3. Mời quản lý](#3--mời-quản-lý-và-thành-viên-chủ-trọ) · [4. Đồng bộ](#4--đồng-bộ) · [5. Luồng xử lý trong app](#5-luồng-xử-lý-trong-app) · [6. Giới hạn](#6-giới-hạn) · [7. CRUD từng phần](#7--crud-từng-phần) · [8. Request / response thật](#8-request--response-thật-của-từng-endpoint)
 
 ## 0. Tóm tắt endpoint
 
@@ -60,7 +60,7 @@ Phản hồi có `X-Request-Id` (cũng là `requestId` trong body lỗi): ghi v�
 ```
 App **dịch theo `code`**, không hiển thị `message` thô (`message` chỉ là chữ dự phòng theo `Accept-Language`).
 
-Mã lỗi từng trường (`fields[].code`): `required`, `invalid_type`, `too_short`, `too_long`, `out_of_range`, `invalid_format`, `invalid_enum`, `weak_password`, `terms_required`, `not_found` (liên kết không tồn tại), `duplicate`, `duplicate_id`, `invite_invalid`, `wrong_password`, `same_as_old`.
+Mã lỗi từng trường (`fields[].code`): `phone_taken`, `required`, `invalid_type`, `too_short`, `too_long`, `out_of_range`, `invalid_format`, `invalid_enum`, `weak_password`, `terms_required`, `not_found` (liên kết không tồn tại), `duplicate`, `duplicate_id`, `invite_invalid`, `wrong_password`, `same_as_old`.
 
 | HTTP | `code` | App nên làm |
 |---|---|---|
@@ -73,7 +73,7 @@ Mã lỗi từng trường (`fields[].code`): `required`, `invalid_type`, `too_s
 | 403 | `forbidden` | Vai trò không đủ quyền (quản lý vào phần của chủ trọ) |
 | 403 | `no_property` | Tài khoản chưa thuộc nhà trọ nào → màn hình "nhập mã mời / tạo nhà trọ" |
 | 404 | `not_found` | Bản ghi không còn (bị xóa ở máy khác): tải lại danh sách |
-| 409 | `email_taken`, `already_member`, `already_in_property`, `has_property`, `owner_cannot_leave` | Thông báo tương ứng |
+| 409 | `email_taken`, `phone_taken`, `already_member`, `already_in_property`, `has_property`, `owner_cannot_leave` | Thông báo tương ứng |
 | 409 | `version_conflict` | Bản ghi đã bị sửa ở nơi khác; body có `current` (bản mới nhất) để hiện so sánh |
 | 409 | `duplicate` | Đã tồn tại (vd kỳ thu tháng này); body có `existingId` |
 | 409 | `has_dependents` | Không xóa được vì còn dữ liệu liên kết; `blockedBy` liệt kê phần đang vướng |
@@ -118,6 +118,7 @@ Tạo **tài khoản + nhà trọ trong một giao dịch**. `billing`, `rates`,
 }
 ```
 * Mật khẩu: 8-72 byte, có chữ và số. Email không phân biệt hoa thường.
+* **`property.phone` là SĐT đăng nhập của chủ trọ** (xem 2.3). Không được trùng với nhà trọ khác: trùng → `409 phone_taken`, `fields: [{ field: "property.phone", code: "phone_taken" }]`. Bỏ trống thì chủ trọ chỉ đăng nhập bằng email.
 * `dayCountMode`: `fixed30` | `actual`. `electric.mode`: `flat` (cần `price`) | `tiered` (cần `tiers: [{fromKwh, toKwh, pricePerKwh, name?}]`, liền nhau từ 0, chỉ bậc cuối được `toKwh: null`). `water.mode`: `per_m3` | `per_person`. `services[].calcMode`: `per_room` | `per_person` | `per_use`.
 * `layout` dạng tự liệt kê (đúng như bản xem trước đã sửa trong app):
   `{ "blocks": [{ "id?": "...", "name": "Dãy A" }], "floors": [{ "id?", "blockId" | "blockIndex": 0, "label": "Tầng 1" }], "rooms": [{ "id?", "floorId" | "floorIndex": 0, "name": "A101", "monthlyRent": 2500000, "areaSqm?": 18.5, "capacity?": 2 }] }`.
@@ -145,8 +146,13 @@ Phản hồi (dùng chung cho đăng ký, đăng nhập, nhận mời, tạo nh�
 Bản ghi sinh sẵn (khi không có `seed: false`): `AppSettings` (id `"main"`), `ElectricityTier`, `WaterRate`, `Service` + `ServicePrice`, `Block`, `Floor`, `Room` (`status: "vacant"`, có `nameNoAccent`) + `RoomPrice`, `OnboardingStep` (`property_info`, `billing_rules`, `rates`, `blocks_rooms`, `first_tenant`, đánh dấu `isDone` theo những gì đã nhập).
 
 ### 2.3 `POST /v1/auth/login` → `200`
-`{ "email", "password", "deviceName", "deviceId" }` → `{ account, property, role, tokens }`. Sai 5 lần/15 phút → `429`.
-Đăng nhập lại từ cùng `deviceId` sẽ thay phiên cũ của máy đó.
+`{ "login": "<email hoặc số điện thoại>", "password", "deviceName", "deviceId" }` → `{ account, property, role, tokens }`.
+* `login` có `@` → email (không phân biệt hoa thường); không có `@` → số điện thoại. Server tự chuẩn hóa SĐT: `0901 234 567`, `090.123.4567`, `+84 901 234 567`, `84901234567` đều là `0901234567`. App cứ gửi nguyên chuỗi người dùng gõ, một ô nhập chung "Email hoặc số điện thoại".
+* **SĐT đăng nhập = SĐT nhà trọ của chủ trọ** (`account.phone` trong phản hồi). Sửa SĐT nhà trọ (`PATCH /v1/me` trường `phone`, `PATCH /v1/settings`, hoặc push `AppSettings.phone`) thì SĐT đăng nhập đổi theo. **Quản lý** không có SĐT đăng nhập (`account.phone = null`), đăng nhập bằng email.
+* Trường `email` cũ vẫn nhận (tương đương `login`).
+* Sai thông tin → `401 invalid_credentials` (không cho biết sai email/SĐT hay sai mật khẩu). `login` không phải email cũng không phải SĐT → `400`, `fields: [{ field: "login", code: "invalid_format" }]`.
+* Sai 5 lần/15 phút → `429 too_many_attempts`; tính theo tài khoản, nhập email hay SĐT đều cộng chung.
+* Đăng nhập lại từ cùng `deviceId` sẽ thay phiên cũ của máy đó.
 
 ### 2.4 `POST /v1/auth/refresh` → `200`
 `{ "refreshToken" }` → `{ "tokens": {...} }`. **Mỗi lần trả cặp mới, cặp cũ vô hiệu.** Gửi lại refresh token cũ → cả phiên bị thu hồi (`refresh_reused`).
@@ -158,7 +164,7 @@ Bản ghi sinh sẵn (khi không có `seed: false`): `AppSettings` (id `"main"`)
 `{ "refreshToken" }` (Bearer tùy chọn). Luôn `204`.
 
 ### 2.6 Quên / đặt lại mật khẩu
-* `POST /v1/auth/forgot` `{ "email" }` → **luôn `202`** `{ "status": "accepted" }`, kể cả email chưa đăng ký (không lộ email nào có tài khoản). Gửi `Accept-Language` để email đúng ngôn ngữ.
+* `POST /v1/auth/forgot` `{ "email" }` (**chỉ email**, không nhận SĐT) → **luôn `202`** `{ "status": "accepted" }`, kể cả email chưa đăng ký (không lộ email nào có tài khoản). Gửi `Accept-Language` để email đúng ngôn ngữ.
   * Email gửi tới **địa chỉ đã đăng ký**, tiêu đề `ABCD-EFGH là mã đặt lại mật khẩu RoomKeep của bạn`; mã hiệu lực 30 phút, dùng 1 lần.
   * Yêu cầu mã mới thì mã cũ hết hiệu lực. Tối đa 3 mã/giờ/email (quá thì vẫn `202` nhưng không gửi).
   * Gọi mất vài giây (chờ máy chủ email): hiện vòng xoay chờ, timeout 15 giây.
@@ -176,10 +182,10 @@ Luồng màn hình đề xuất: *Quên mật khẩu* (nhập email) → *Nhập
 
 ### 2.8 🔒 Hồ sơ
 * `GET /v1/me` → `{ account, property, role }` (`property` = `null` nếu chưa thuộc nhà trọ nào).
-* `PATCH /v1/me` gửi trường muốn đổi: `displayName`, `preferredLanguage` (`vi`|`en`), `email` (**kèm `password`**), `propertyName`, `address`, `phone` (3 trường nhà trọ chỉ chủ trọ). Trả `{ account, property, role }`. Đổi thông tin nhà trọ cũng cập nhật bản ghi `AppSettings` (các máy khác nhận khi pull).
+* `PATCH /v1/me` gửi trường muốn đổi: `displayName`, `preferredLanguage` (`vi`|`en`), `email` (**kèm `password`**), `propertyName`, `address`, `phone` (3 trường nhà trọ chỉ chủ trọ; `phone` cũng là SĐT đăng nhập của chủ trọ, trùng nhà trọ khác → `409 phone_taken`). Trả `{ account, property, role }`. Đổi thông tin nhà trọ cũng cập nhật bản ghi `AppSettings` (các máy khác nhận khi pull).
 * `DELETE /v1/me` `{ "password" }` → `204`. **Chủ trọ: xóa nhà trọ và toàn bộ dữ liệu trên máy chủ**, quản lý mất quyền truy cập. Quản lý: chỉ xóa tài khoản của mình.
 * `POST /v1/me/property` `{ "property": {...như đăng ký}, "seed"?: false }` → `201` (cùng định dạng 2.2): cho tài khoản chưa có nhà trọ (vd quản lý bị gỡ).
-* Trang web yêu cầu xóa (đưa link lên Google Play): `https://roomkeepapi-ivory.vercel.app/account/delete` (thêm `?lang=en`).
+* Trang web yêu cầu xóa (đưa link lên Google Play): `https://roomkeepapi-ivory.vercel.app/account/delete` (thêm `?lang=en`). Người dùng nhập email hoặc SĐT + mật khẩu.
 
 ### 2.9 🔒 Thiết bị
 * `GET /v1/devices` → `{ "devices": [{ "id", "name", "createdAt", "lastSeenAt", "expiresAt", "isCurrent" }] }`
@@ -263,7 +269,7 @@ Nguyên tắc chung: **giao diện chỉ đọc từ Room trên máy**; API ch�
 
 ### 5.1 Mở app
 1. `GET /v1/health` (không bắt buộc chờ): nếu `minAppVersion` > phiên bản app → màn hình bắt buộc cập nhật.
-2. Còn token trong bộ nhớ (app chưa bị đóng) → vào thẳng. Không còn → màn hình chọn **Đăng nhập** / **Đăng ký** / **Dùng không tài khoản**. Ô email điền sẵn email lần trước (chỉ nhớ email, không nhớ mật khẩu).
+2. Còn token trong bộ nhớ (app chưa bị đóng) → vào thẳng. Không còn → màn hình chọn **Đăng nhập** / **Đăng ký** / **Dùng không tài khoản**. Màn hình đăng nhập có **một ô "Email hoặc số điện thoại"**, điền sẵn giá trị lần trước (không nhớ mật khẩu).
 3. Đã đăng nhập → mở tệp Room của tài khoản (`roomkeep_<accountId>.db`), đẩy outbox (`sync/push`) rồi kéo thay đổi (`sync/pull?since=<lastPulledRev>`).
 
 ### 5.2 Giữ phiên đăng nhập
@@ -1384,3 +1390,2331 @@ Mọi endpoint cần `Authorization: Bearer <accessToken>` và tài khoản đã
 | `isDone` | true/false |  | `false` |
 
 <!-- CRUD:END -->
+
+<!-- EXAMPLES:START: phần này sinh tự động bằng `npm run docs:examples` (chạy API thật trên database tạm), đừng sửa tay -->
+## 8. Request / response thật của từng endpoint
+
+Mọi ví dụ dưới đây là **phản hồi thật** của API (cùng code đang chạy trên Vercel), chụp lại bằng script. Id, thời điểm, mã sẽ khác mỗi lần, **tên trường, kiểu và cấu trúc thì giống hệt**. Token được rút gọn cho dễ đọc.
+
+Quy ước kiểu: id = chuỗi UUID; thời điểm = chuỗi ISO 8601 UTC (`2026-11-15T08:00:00Z`); ngày = `yyyy-MM-dd`; tiền = số nguyên đồng; trường có thể `null` được ghi rõ ở mục 8.0.
+
+### 8.0 Model dùng chung (để khai báo data class)
+
+| Model | Trường (kiểu, `?` = có thể null) |
+|---|---|
+| `Account` | `id` string, `email` string, `phone` string? (SĐT đăng nhập = SĐT nhà trọ, chỉ chủ trọ), `displayName` string, `preferredLanguage` "vi"\|"en", `role` "owner"\|"manager"?, `propertyId` string?, `createdAt` string |
+| `Property` | `id` string, `name` string, `address` string, `phone` string, `ownerId` string, `createdAt` string |
+| `Profile` | `account` Account, `property` Property?, `role` "owner"\|"manager"? |
+| `Tokens` | `tokenType` "Bearer", `accessToken` string, `accessTokenExpiresAt` string, `expiresIn` int (giây), `refreshToken` string, `refreshTokenExpiresAt` string, `sessionExpiresAt` string, `deviceId` string |
+| `AuthResponse` | Profile + `tokens` Tokens (+ `changes` SyncRecord[], `rev` int, `hasMore` bool khi đăng ký / nhận mời / tạo nhà trọ) |
+| `SyncRecord` | `table` string, `id` string, `rev` int, `op` "upsert"\|"delete", `isDeleted` bool, `updatedAt` string? (do app gửi), `serverUpdatedAt` string, `payload` object (các cột của bảng + `id`, `isDeleted`, `isDemo`, `updatedAt`) |
+| `SyncChange` (gửi lên) | `table` string, `id` string, `op` "upsert"\|"delete", `baseRev` int?, `updatedAt` string?, `payload` object? (bắt buộc khi upsert), `idempotencyKey` string? |
+| `PushResponse` | `accepted` [{`table`, `id`, `idempotencyKey`?, `rev` int, `duplicate`? bool, `unchanged`? bool}], `conflicts` [{`table`, `id`, `idempotencyKey`?, `baseRev` int?, `server` SyncRecord}], `rejected` [{`table`?, `id`?, `idempotencyKey`?, `code` string, `field` string, `fields`? FieldError[]}], `newRev` int |
+| `PullResponse` | `changes` SyncRecord[], `nextRev` int, `hasMore` bool, `serverRev` int |
+| `CrudRecord` | `id` string + mọi trường của bảng (mục 7.4, chưa có = `null`) + trường tính sẵn + `isDemo` bool, `rev` int, `createdAt` string, `updatedAt` string |
+| `CrudList` | `data` CrudRecord[], `page` {`limit` int, `offset` int, `total` int} |
+| `ApiError` | `code` string, `message` string, `requestId` string, `fields`? FieldError[], cùng các trường thêm tùy mã lỗi (`retryAfter`, `current`, `blockedBy`, `existingId`, `conflictWith`, `minAppVersion`...) |
+| `FieldError` | `field` string, `code` string |
+
+**Lưu ý khi parse:** JSON có thể có thêm trường mới trong các bản sau, nên bật `ignoreUnknownKeys` (kotlinx.serialization) hoặc `FAIL_ON_UNKNOWN_PROPERTIES = false` (Jackson/Moshi tương đương). Riêng `payload` của SyncRecord nên parse theo `table` (hoặc giữ dạng `JsonObject` rồi ánh xạ trong lớp chuyển đổi), vì mỗi bảng một cấu trúc.
+
+### 8.1 Hệ thống
+
+#### Kiểm tra sống
+
+`GET /v1/health` → **200**
+
+Response:
+```json
+{
+  "status": "ok",
+  "apiVersion": "1.0.0",
+  "minAppVersion": "1.0.0",
+  "latestAppVersion": "1.0.0",
+  "serverTime": "2026-11-14T19:03:08Z"
+}
+```
+
+### 8.2 Đăng ký, đăng nhập, phiên
+
+#### Đăng ký, app tự tạo dữ liệu ở máy (`seed: false`)
+
+`POST /v1/auth/register` → **201**
+
+Request:
+```http
+POST https://roomkeepapi-ivory.vercel.app/v1/auth/register
+Accept-Language: vi
+Content-Type: application/json
+```
+```json
+{
+  "account": {
+    "email": "chu@example.com",
+    "password": "Matkhau2026",
+    "displayName": "Cô Lan"
+  },
+  "acceptTerms": true,
+  "seed": false,
+  "property": {
+    "name": "Nhà trọ Hoa Sen",
+    "address": "12 Lê Lợi",
+    "phone": "0901234567"
+  },
+  "deviceName": "Pixel 8",
+  "deviceId": "install-1",
+  "idempotencyKey": "6f1c2c8e-0d1a-4c1e-9a55-1e2b3c4d5e6f"
+}
+```
+Response:
+```json
+{
+  "account": {
+    "id": "bd0b1695-6a3e-4fc2-bab7-a6bd5f68fc5f",
+    "email": "chu@example.com",
+    "phone": "0901234567",
+    "displayName": "Cô Lan",
+    "preferredLanguage": "vi",
+    "role": "owner",
+    "propertyId": "d2947763-4109-45f1-bf1c-35a44fbdfb99",
+    "createdAt": "2026-11-14T19:03:08Z"
+  },
+  "property": {
+    "id": "d2947763-4109-45f1-bf1c-35a44fbdfb99",
+    "name": "Nhà trọ Hoa Sen",
+    "address": "12 Lê Lợi",
+    "phone": "0901234567",
+    "ownerId": "bd0b1695-6a3e-4fc2-bab7-a6bd5f68fc5f",
+    "createdAt": "2026-11-14T19:03:08Z"
+  },
+  "role": "owner",
+  "tokens": {
+    "tokenType": "Bearer",
+    "accessToken": "eyJhbGciOiJIUzI1NiIsInR5…",
+    "accessTokenExpiresAt": "2026-11-14T21:03:08Z",
+    "expiresIn": 7199,
+    "refreshToken": "62c9f0c8-4798-4988-8a72-…",
+    "refreshTokenExpiresAt": "2026-11-14T22:03:08Z",
+    "sessionExpiresAt": "2026-11-15T07:03:08Z",
+    "deviceId": "62c9f0c8-4798-4988-8a72-0be7fab2c062"
+  },
+  "changes": [],
+  "rev": 0,
+  "hasMore": false
+}
+```
+* Gửi lại đúng body này (cùng `idempotencyKey`) sau khi mất mạng → `200` với cùng tài khoản.
+
+#### Đăng ký, server sinh sẵn dữ liệu (`layout`, `rates`, `billing`)
+
+`POST /v1/auth/register` → **201**
+
+Request:
+```http
+POST https://roomkeepapi-ivory.vercel.app/v1/auth/register
+Content-Type: application/json
+```
+```json
+{
+  "account": {
+    "email": "chu2@example.com",
+    "password": "Matkhau2026",
+    "displayName": "Chú Tư"
+  },
+  "acceptTerms": true,
+  "property": {
+    "name": "Trọ Bình An",
+    "billing": {
+      "meterDay": 25,
+      "dueDay": 5,
+      "dayCountMode": "fixed30"
+    },
+    "rates": {
+      "electric": {
+        "mode": "flat",
+        "price": 3500
+      },
+      "water": {
+        "mode": "per_m3",
+        "price": 18000
+      },
+      "services": [
+        {
+          "name": "Internet",
+          "calcMode": "per_room",
+          "price": 100000
+        }
+      ]
+    },
+    "layout": {
+      "blocks": [
+        {
+          "id": "blk-a",
+          "name": "Dãy A"
+        }
+      ],
+      "floors": [
+        {
+          "id": "flr-a1",
+          "blockId": "blk-a",
+          "label": "Tầng 1"
+        }
+      ],
+      "rooms": [
+        {
+          "id": "room-a101",
+          "floorId": "flr-a1",
+          "name": "A101",
+          "monthlyRent": 2500000
+        },
+        {
+          "id": "room-a102",
+          "floorId": "flr-a1",
+          "name": "A102",
+          "monthlyRent": 2500000
+        }
+      ]
+    }
+  },
+  "deviceName": "Galaxy A55"
+}
+```
+Response:
+```json
+{
+  "account": {
+    "id": "29d65311-c37b-4b51-92c7-d77b1a6f82f7",
+    "email": "chu2@example.com",
+    "phone": null,
+    "displayName": "Chú Tư",
+    "preferredLanguage": "vi",
+    "role": "owner",
+    "propertyId": "685a3f6e-c0cf-44fe-a902-8cc7e4607fd9",
+    "createdAt": "2026-11-14T19:03:08Z"
+  },
+  "property": {
+    "id": "685a3f6e-c0cf-44fe-a902-8cc7e4607fd9",
+    "name": "Trọ Bình An",
+    "address": "",
+    "phone": "",
+    "ownerId": "29d65311-c37b-4b51-92c7-d77b1a6f82f7",
+    "createdAt": "2026-11-14T19:03:08Z"
+  },
+  "role": "owner",
+  "tokens": {
+    "tokenType": "Bearer",
+    "accessToken": "eyJhbGciOiJIUzI1NiIsInR5…",
+    "accessTokenExpiresAt": "2026-11-14T21:03:08Z",
+    "expiresIn": 7199,
+    "refreshToken": "1c023d4a-d96d-4320-86c6-…",
+    "refreshTokenExpiresAt": "2026-11-14T22:03:08Z",
+    "sessionExpiresAt": "2026-11-15T07:03:08Z",
+    "deviceId": "1c023d4a-d96d-4320-86c6-07dce853ec99"
+  },
+  "changes": [
+    {
+      "table": "AppSettings",
+      "id": "main",
+      "rev": 1,
+      "op": "upsert",
+      "isDeleted": false,
+      "updatedAt": "2026-11-14T19:03:08.854Z",
+      "serverUpdatedAt": "2026-11-14T19:03:08Z",
+      "payload": {
+        "id": "main",
+        "language": "vi",
+        "propertyName": "Trọ Bình An",
+        "address": "",
+        "phone": "",
+        "meterDay": 25,
+        "cycleStartDay": 1,
+        "dueDay": 5,
+        "dayCountMode": "fixed30",
+        "roundingStep": 1000,
+        "dateFormat": "dd/MM/yyyy",
+        "rulesText": "",
+        "updatedAt": "2026-11-14T19:03:08.854Z",
+        "isDeleted": false,
+        "isDemo": false
+      }
+    },
+    {
+      "table": "ElectricityTier",
+      "id": "01497a33-4b83-4faf-b5e0-74fa83628c78",
+      "rev": 2,
+      "op": "upsert",
+      "isDeleted": false,
+      "updatedAt": "2026-11-14T19:03:08.854Z",
+      "serverUpdatedAt": "2026-11-14T19:03:08Z",
+      "payload": {
+        "id": "01497a33-4b83-4faf-b5e0-74fa83628c78",
+        "name": "Đồng giá",
+        "fromKwh": 0,
+        "toKwh": null,
+        "pricePerKwh": 3500,
+        "effectiveFrom": "2026-11-15",
+        "updatedAt": "2026-11-14T19:03:08.854Z",
+        "isDeleted": false,
+        "isDemo": false
+      }
+    },
+    {
+      "table": "WaterRate",
+      "id": "e93ffa89-3594-44a9-8656-98d5e17096f5",
+      "rev": 3,
+      "op": "upsert",
+      "isDeleted": false,
+      "updatedAt": "2026-11-14T19:03:08.854Z",
+      "serverUpdatedAt": "2026-11-14T19:03:08Z",
+      "payload": {
+        "id": "e93ffa89-3594-44a9-8656-98d5e17096f5",
+        "mode": "per_m3",
+        "pricePerUnit": 18000,
+        "effectiveFrom": "2026-11-15",
+        "updatedAt": "2026-11-14T19:03:08.854Z",
+        "isDeleted": false,
+        "isDemo": false
+      }
+    }
+  ],
+  "rev": 16,
+  "hasMore": false
+}
+```
+* `changes` có 16 phần tử, chỉ hiện 3 phần tử đầu.
+
+#### Đăng nhập bằng email
+
+`POST /v1/auth/login` → **200**
+
+Request:
+```http
+POST https://roomkeepapi-ivory.vercel.app/v1/auth/login
+Content-Type: application/json
+```
+```json
+{
+  "login": "chu@example.com",
+  "password": "Matkhau2026",
+  "deviceName": "Pixel 8",
+  "deviceId": "install-1"
+}
+```
+Response:
+```json
+{
+  "account": {
+    "id": "bd0b1695-6a3e-4fc2-bab7-a6bd5f68fc5f",
+    "email": "chu@example.com",
+    "phone": "0901234567",
+    "displayName": "Cô Lan",
+    "preferredLanguage": "vi",
+    "role": "owner",
+    "propertyId": "d2947763-4109-45f1-bf1c-35a44fbdfb99",
+    "createdAt": "2026-11-14T19:03:08Z"
+  },
+  "property": {
+    "id": "d2947763-4109-45f1-bf1c-35a44fbdfb99",
+    "name": "Nhà trọ Hoa Sen",
+    "address": "12 Lê Lợi",
+    "phone": "0901234567",
+    "ownerId": "bd0b1695-6a3e-4fc2-bab7-a6bd5f68fc5f",
+    "createdAt": "2026-11-14T19:03:08Z"
+  },
+  "role": "owner",
+  "tokens": {
+    "tokenType": "Bearer",
+    "accessToken": "eyJhbGciOiJIUzI1NiIsInR5…",
+    "accessTokenExpiresAt": "2026-11-14T21:03:08Z",
+    "expiresIn": 7199,
+    "refreshToken": "385aef73-101e-4c53-8d79-…",
+    "refreshTokenExpiresAt": "2026-11-14T22:03:08Z",
+    "sessionExpiresAt": "2026-11-15T07:03:08Z",
+    "deviceId": "385aef73-101e-4c53-8d79-86cb997d25ff"
+  }
+}
+```
+
+#### Đăng nhập bằng số điện thoại (SĐT nhà trọ)
+
+`POST /v1/auth/login` → **200**
+
+Request:
+```http
+POST https://roomkeepapi-ivory.vercel.app/v1/auth/login
+Content-Type: application/json
+```
+```json
+{
+  "login": "0901 234 567",
+  "password": "Matkhau2026",
+  "deviceName": "Pixel 8",
+  "deviceId": "install-1"
+}
+```
+Response:
+```json
+{
+  "account": {
+    "id": "bd0b1695-6a3e-4fc2-bab7-a6bd5f68fc5f",
+    "email": "chu@example.com",
+    "phone": "0901234567",
+    "displayName": "Cô Lan",
+    "preferredLanguage": "vi",
+    "role": "owner",
+    "propertyId": "d2947763-4109-45f1-bf1c-35a44fbdfb99",
+    "createdAt": "2026-11-14T19:03:08Z"
+  },
+  "property": {
+    "id": "d2947763-4109-45f1-bf1c-35a44fbdfb99",
+    "name": "Nhà trọ Hoa Sen",
+    "address": "12 Lê Lợi",
+    "phone": "0901234567",
+    "ownerId": "bd0b1695-6a3e-4fc2-bab7-a6bd5f68fc5f",
+    "createdAt": "2026-11-14T19:03:08Z"
+  },
+  "role": "owner",
+  "tokens": {
+    "tokenType": "Bearer",
+    "accessToken": "eyJhbGciOiJIUzI1NiIsInR5…",
+    "accessTokenExpiresAt": "2026-11-14T21:03:08Z",
+    "expiresIn": 7199,
+    "refreshToken": "fcfa6edf-207e-4e90-a44e-…",
+    "refreshTokenExpiresAt": "2026-11-14T22:03:08Z",
+    "sessionExpiresAt": "2026-11-15T07:03:08Z",
+    "deviceId": "fcfa6edf-207e-4e90-a44e-2c21c42fc781"
+  }
+}
+```
+* Gửi nguyên chuỗi người dùng gõ; server chuẩn hóa `0901 234 567` / `+84901234567` thành `0901234567`.
+
+#### Làm mới token
+
+`POST /v1/auth/refresh` → **200**
+
+Request:
+```http
+POST https://roomkeepapi-ivory.vercel.app/v1/auth/refresh
+Content-Type: application/json
+```
+```json
+{
+  "refreshToken": "fcfa6edf-207e-4e90-a44e-2c21c42fc781.YHQw3RJYZp3QhQh6gpQj-JphymTtrE7oz441I76JMUM"
+}
+```
+Response:
+```json
+{
+  "tokens": {
+    "tokenType": "Bearer",
+    "accessToken": "eyJhbGciOiJIUzI1NiIsInR5…",
+    "accessTokenExpiresAt": "2026-11-14T21:03:08Z",
+    "expiresIn": 7199,
+    "refreshToken": "fcfa6edf-207e-4e90-a44e-…",
+    "refreshTokenExpiresAt": "2026-11-14T22:03:08Z",
+    "sessionExpiresAt": "2026-11-15T07:03:08Z",
+    "deviceId": "fcfa6edf-207e-4e90-a44e-2c21c42fc781"
+  }
+}
+```
+* `refreshToken` cũ hết hiệu lực ngay; luôn thay cả cặp.
+
+#### Hồ sơ
+
+`GET /v1/me` → **200**
+
+Request:
+```http
+GET https://roomkeepapi-ivory.vercel.app/v1/me
+Authorization: Bearer <accessToken>
+```
+Response:
+```json
+{
+  "account": {
+    "id": "bd0b1695-6a3e-4fc2-bab7-a6bd5f68fc5f",
+    "email": "chu@example.com",
+    "phone": "0901234567",
+    "displayName": "Cô Lan",
+    "preferredLanguage": "vi",
+    "role": "owner",
+    "propertyId": "d2947763-4109-45f1-bf1c-35a44fbdfb99",
+    "createdAt": "2026-11-14T19:03:08Z"
+  },
+  "property": {
+    "id": "d2947763-4109-45f1-bf1c-35a44fbdfb99",
+    "name": "Nhà trọ Hoa Sen",
+    "address": "12 Lê Lợi",
+    "phone": "0901234567",
+    "ownerId": "bd0b1695-6a3e-4fc2-bab7-a6bd5f68fc5f",
+    "createdAt": "2026-11-14T19:03:08Z"
+  },
+  "role": "owner"
+}
+```
+
+#### Sửa hồ sơ
+
+`PATCH /v1/me` → **200**
+
+Request:
+```http
+PATCH https://roomkeepapi-ivory.vercel.app/v1/me
+Authorization: Bearer <accessToken>
+Content-Type: application/json
+```
+```json
+{
+  "displayName": "Cô Lan Anh",
+  "preferredLanguage": "vi"
+}
+```
+Response:
+```json
+{
+  "account": {
+    "id": "bd0b1695-6a3e-4fc2-bab7-a6bd5f68fc5f",
+    "email": "chu@example.com",
+    "phone": "0901234567",
+    "displayName": "Cô Lan Anh",
+    "preferredLanguage": "vi",
+    "role": "owner",
+    "propertyId": "d2947763-4109-45f1-bf1c-35a44fbdfb99",
+    "createdAt": "2026-11-14T19:03:08Z"
+  },
+  "property": {
+    "id": "d2947763-4109-45f1-bf1c-35a44fbdfb99",
+    "name": "Nhà trọ Hoa Sen",
+    "address": "12 Lê Lợi",
+    "phone": "0901234567",
+    "ownerId": "bd0b1695-6a3e-4fc2-bab7-a6bd5f68fc5f",
+    "createdAt": "2026-11-14T19:03:08Z"
+  },
+  "role": "owner"
+}
+```
+
+#### Thiết bị đã đăng nhập
+
+`GET /v1/devices` → **200**
+
+Request:
+```http
+GET https://roomkeepapi-ivory.vercel.app/v1/devices
+Authorization: Bearer <accessToken>
+```
+Response:
+```json
+{
+  "devices": [
+    {
+      "id": "fcfa6edf-207e-4e90-a44e-2c21c42fc781",
+      "name": "Pixel 8",
+      "createdAt": "2026-11-14T19:03:08Z",
+      "lastSeenAt": "2026-11-14T19:03:08Z",
+      "expiresAt": "2026-11-15T07:03:08Z",
+      "isCurrent": true
+    }
+  ]
+}
+```
+
+### 8.3 Mật khẩu
+
+#### Quên mật khẩu
+
+`POST /v1/auth/forgot` → **202**
+
+Request:
+```http
+POST https://roomkeepapi-ivory.vercel.app/v1/auth/forgot
+Accept-Language: vi
+Content-Type: application/json
+```
+```json
+{
+  "email": "chu@example.com"
+}
+```
+Response:
+```json
+{
+  "status": "accepted",
+  "devToken": "68YT-CBZ7"
+}
+```
+* **Production chỉ trả `{ "status": "accepted" }`.** `devToken` chỉ có ở môi trường dev chưa cấu hình email (như lúc chụp ví dụ này); mã thật nằm trong email.
+
+#### Đặt lại mật khẩu
+
+`POST /v1/auth/reset` → **204**
+
+Request:
+```http
+POST https://roomkeepapi-ivory.vercel.app/v1/auth/reset
+Content-Type: application/json
+```
+```json
+{
+  "token": "68YT-CBZ7",
+  "newPassword": "Matkhau2027"
+}
+```
+Response:
+```
+(không có body)
+```
+* Mọi thiết bị bị đăng xuất: phải đăng nhập lại.
+
+#### Đổi mật khẩu
+
+`POST /v1/auth/change-password` → **200**
+
+Request:
+```http
+POST https://roomkeepapi-ivory.vercel.app/v1/auth/change-password
+Authorization: Bearer <accessToken>
+Content-Type: application/json
+```
+```json
+{
+  "oldPassword": "Matkhau2027",
+  "newPassword": "Matkhau2026"
+}
+```
+Response:
+```json
+{
+  "status": "ok",
+  "revokedSessions": 0
+}
+```
+
+### 8.4 Đồng bộ
+
+#### Đẩy thay đổi (bản ghi mới)
+
+`POST /v1/sync/push` → **200**
+
+Request:
+```http
+POST https://roomkeepapi-ivory.vercel.app/v1/sync/push
+Authorization: Bearer <accessToken>
+Content-Type: application/json
+```
+```json
+{
+  "deviceId": "install-1",
+  "changes": [
+    {
+      "table": "AppSettings",
+      "id": "main",
+      "op": "upsert",
+      "baseRev": null,
+      "updatedAt": "2026-11-15T08:00:00Z",
+      "idempotencyKey": "k-settings-1",
+      "payload": {
+        "propertyName": "Nhà trọ Hoa Sen",
+        "meterDay": 28,
+        "dueDay": 5,
+        "dayCountMode": "fixed30",
+        "roundingStep": 1000,
+        "elecPrice": 3500
+      }
+    },
+    {
+      "table": "Block",
+      "id": "blk-a",
+      "op": "upsert",
+      "baseRev": null,
+      "idempotencyKey": "k-blk-a",
+      "payload": {
+        "name": "Dãy A",
+        "sortOrder": 0
+      }
+    },
+    {
+      "table": "Floor",
+      "id": "flr-a1",
+      "op": "upsert",
+      "baseRev": null,
+      "idempotencyKey": "k-flr-a1",
+      "payload": {
+        "blockId": "blk-a",
+        "label": "Tầng 1",
+        "sortOrder": 0
+      }
+    },
+    {
+      "table": "Room",
+      "id": "room-a101",
+      "op": "upsert",
+      "baseRev": null,
+      "idempotencyKey": "k-room-a101",
+      "payload": {
+        "floorId": "flr-a1",
+        "name": "A101",
+        "capacity": 2,
+        "rent": 2500000,
+        "area": 18
+      }
+    },
+    {
+      "table": "Tenant",
+      "id": "ten-1",
+      "op": "upsert",
+      "baseRev": null,
+      "idempotencyKey": "k-ten-1",
+      "payload": {
+        "name": "Nguyễn Văn An",
+        "phone": "0900000101"
+      }
+    }
+  ]
+}
+```
+Response:
+```json
+{
+  "accepted": [
+    {
+      "table": "AppSettings",
+      "id": "main",
+      "idempotencyKey": "k-settings-1",
+      "rev": 1
+    },
+    {
+      "table": "Block",
+      "id": "blk-a",
+      "idempotencyKey": "k-blk-a",
+      "rev": 2
+    },
+    {
+      "table": "Floor",
+      "id": "flr-a1",
+      "idempotencyKey": "k-flr-a1",
+      "rev": 3
+    }
+  ],
+  "conflicts": [],
+  "rejected": [],
+  "newRev": 5
+}
+```
+* `accepted` có 5 phần tử, chỉ hiện 3 phần tử đầu.
+* `rent`, `area`, `elecPrice` không có trong schema: server **giữ nguyên** (trường riêng của app), không báo lỗi. Ghi `rev` của từng bản ghi vào `serverRev` ở máy.
+
+#### Đẩy thay đổi: có xung đột và bị từ chối
+
+`POST /v1/sync/push` → **200**
+
+Request:
+```http
+POST https://roomkeepapi-ivory.vercel.app/v1/sync/push
+Authorization: Bearer <accessToken>
+Content-Type: application/json
+```
+```json
+{
+  "deviceId": "install-1",
+  "changes": [
+    {
+      "table": "Room",
+      "id": "room-a101",
+      "op": "upsert",
+      "baseRev": 4,
+      "idempotencyKey": "k-room-a101-2",
+      "payload": {
+        "floorId": "flr-a1",
+        "name": "A101",
+        "capacity": 2,
+        "rent": 2700000
+      }
+    },
+    {
+      "table": "Contract",
+      "id": "ct-1",
+      "op": "upsert",
+      "baseRev": null,
+      "idempotencyKey": "k-ct-1",
+      "payload": {
+        "roomId": "room-a101",
+        "tenantId": "ten-1",
+        "rent": 2500000,
+        "start": "2026-11-01"
+      }
+    },
+    {
+      "table": "Tenant",
+      "id": "ten-2",
+      "op": "upsert",
+      "baseRev": null,
+      "idempotencyKey": "k-ten-2",
+      "payload": {
+        "name": "Trần Thị Bích",
+        "phone": "0900000102",
+        "segment": "vip"
+      }
+    },
+    {
+      "table": "Tenant",
+      "id": "ten-1",
+      "op": "delete",
+      "baseRev": 5,
+      "idempotencyKey": "k-ten-1-del"
+    }
+  ]
+}
+```
+Response:
+```json
+{
+  "accepted": [
+    {
+      "table": "Tenant",
+      "id": "ten-1",
+      "idempotencyKey": "k-ten-1-del",
+      "rev": 7
+    }
+  ],
+  "conflicts": [
+    {
+      "table": "Room",
+      "id": "room-a101",
+      "idempotencyKey": "k-room-a101-2",
+      "baseRev": 4,
+      "server": {
+        "table": "Room",
+        "id": "room-a101",
+        "rev": 6,
+        "op": "upsert",
+        "isDeleted": false,
+        "updatedAt": null,
+        "serverUpdatedAt": "2026-11-14T19:03:09Z",
+        "payload": {
+          "floorId": "flr-a1",
+          "name": "A101",
+          "capacity": 3,
+          "rent": 2600000,
+          "isDemo": false,
+          "nameNoAccent": "a101",
+          "id": "room-a101",
+          "isDeleted": false
+        }
+      }
+    }
+  ],
+  "rejected": [
+    {
+      "table": "Contract",
+      "id": "ct-1",
+      "idempotencyKey": "k-ct-1",
+      "code": "validation_failed",
+      "field": "leaderTenantId",
+      "fields": [
+        {
+          "field": "leaderTenantId",
+          "code": "required"
+        },
+        {
+          "field": "startDate",
+          "code": "required"
+        },
+        {
+          "field": "monthlyRent",
+          "code": "required"
+        }
+      ]
+    },
+    {
+      "table": "Tenant",
+      "id": "ten-2",
+      "idempotencyKey": "k-ten-2",
+      "code": "validation_failed",
+      "field": "segment",
+      "fields": [
+        {
+          "field": "segment",
+          "code": "invalid_enum"
+        }
+      ]
+    }
+  ],
+  "newRev": 7
+}
+```
+* Room: máy khác đã sửa sau `baseRev` → `conflicts`, kèm bản trên server. Contract: dùng tên trường của app (`tenantId`, `rent`, `start`) nên thiếu các trường bắt buộc `leaderTenantId`, `startDate`, `monthlyRent` → `rejected`, liệt kê đủ trong `fields`. Tenant `segment: "vip"` sai enum → `rejected`. Xóa Tenant → `accepted`.
+
+#### Kéo thay đổi
+
+`GET /v1/sync/pull?since=0&limit=500` → **200**
+
+Request:
+```http
+GET https://roomkeepapi-ivory.vercel.app/v1/sync/pull?since=0&limit=500
+Authorization: Bearer <accessToken>
+```
+Response:
+```json
+{
+  "changes": [
+    {
+      "table": "AppSettings",
+      "id": "main",
+      "rev": 1,
+      "op": "upsert",
+      "isDeleted": false,
+      "updatedAt": "2026-11-15T08:00:00Z",
+      "serverUpdatedAt": "2026-11-14T19:03:09Z",
+      "payload": {
+        "propertyName": "Nhà trọ Hoa Sen",
+        "meterDay": 28,
+        "dueDay": 5,
+        "dayCountMode": "fixed30",
+        "roundingStep": 1000,
+        "elecPrice": 3500,
+        "isDemo": false,
+        "id": "main",
+        "isDeleted": false
+      }
+    },
+    {
+      "table": "Block",
+      "id": "blk-a",
+      "rev": 2,
+      "op": "upsert",
+      "isDeleted": false,
+      "updatedAt": null,
+      "serverUpdatedAt": "2026-11-14T19:03:09Z",
+      "payload": {
+        "name": "Dãy A",
+        "sortOrder": 0,
+        "isDemo": false,
+        "id": "blk-a",
+        "isDeleted": false
+      }
+    },
+    {
+      "table": "Floor",
+      "id": "flr-a1",
+      "rev": 3,
+      "op": "upsert",
+      "isDeleted": false,
+      "updatedAt": null,
+      "serverUpdatedAt": "2026-11-14T19:03:09Z",
+      "payload": {
+        "blockId": "blk-a",
+        "label": "Tầng 1",
+        "sortOrder": 0,
+        "isDemo": false,
+        "id": "flr-a1",
+        "isDeleted": false
+      }
+    }
+  ],
+  "nextRev": 7,
+  "hasMore": false,
+  "serverRev": 7
+}
+```
+* `changes` có 4 phần tử, chỉ hiện 3 phần tử đầu.
+* Lặp với `since = nextRev` khi `hasMore = true`. `since=0` không trả bản ghi đã xóa; `since>0` có trả (`op: "delete"`).
+
+#### Kéo thay đổi, chỉ một số bảng
+
+`GET /v1/sync/pull?since=0&tables=Room,Tenant` → **200**
+
+Request:
+```http
+GET https://roomkeepapi-ivory.vercel.app/v1/sync/pull?since=0&tables=Room,Tenant
+Authorization: Bearer <accessToken>
+```
+Response:
+```json
+{
+  "changes": [
+    {
+      "table": "Room",
+      "id": "room-a101",
+      "rev": 6,
+      "op": "upsert",
+      "isDeleted": false,
+      "updatedAt": null,
+      "serverUpdatedAt": "2026-11-14T19:03:09Z",
+      "payload": {
+        "floorId": "flr-a1",
+        "name": "A101",
+        "capacity": 3,
+        "rent": 2600000,
+        "isDemo": false,
+        "nameNoAccent": "a101",
+        "id": "room-a101",
+        "isDeleted": false
+      }
+    }
+  ],
+  "nextRev": 7,
+  "hasMore": false,
+  "serverRev": 7
+}
+```
+
+#### Tóm tắt đồng bộ
+
+`GET /v1/sync/summary` → **200**
+
+Request:
+```http
+GET https://roomkeepapi-ivory.vercel.app/v1/sync/summary
+Authorization: Bearer <accessToken>
+```
+Response:
+```json
+{
+  "serverRev": 7,
+  "purgedRev": 0,
+  "lastChangeAt": "2026-11-14T19:03:09Z",
+  "tables": {
+    "AppSettings": 1,
+    "Block": 1,
+    "Floor": 1,
+    "Room": 1
+  }
+}
+```
+
+### 8.5 CRUD (ví dụ phòng, hợp đồng, bảng tính tiền)
+
+#### Danh sách phòng
+
+`GET /v1/rooms?limit=50&offset=0` → **200**
+
+Request:
+```http
+GET https://roomkeepapi-ivory.vercel.app/v1/rooms?limit=50&offset=0
+Authorization: Bearer <accessToken>
+```
+Response:
+```json
+{
+  "data": [
+    {
+      "id": "room-a101",
+      "floorId": "flr-a1",
+      "typeId": null,
+      "name": "A101",
+      "areaSqm": null,
+      "capacity": 3,
+      "status": null,
+      "amenitiesText": null,
+      "note": null,
+      "isDemo": false,
+      "rev": 6,
+      "createdAt": "2026-11-14T19:03:09Z",
+      "updatedAt": "2026-11-14T19:03:09Z"
+    }
+  ],
+  "page": {
+    "limit": 50,
+    "offset": 0,
+    "total": 1
+  }
+}
+```
+* Trường riêng của app (`rent`, `area`) không xuất hiện ở CRUD; CRUD chỉ trả các trường của schema (mục 7.4).
+
+#### Tạo phòng
+
+`POST /v1/rooms` → **201**
+
+Request:
+```http
+POST https://roomkeepapi-ivory.vercel.app/v1/rooms
+Authorization: Bearer <accessToken>
+Content-Type: application/json
+```
+```json
+{
+  "id": "room-a102",
+  "floorId": "flr-a1",
+  "name": "A102",
+  "capacity": 2,
+  "areaSqm": 18.5
+}
+```
+Response:
+```json
+{
+  "id": "room-a102",
+  "floorId": "flr-a1",
+  "typeId": null,
+  "name": "A102",
+  "areaSqm": 18.5,
+  "capacity": 2,
+  "status": "vacant",
+  "amenitiesText": null,
+  "note": null,
+  "isDemo": false,
+  "rev": 8,
+  "createdAt": "2026-11-14T19:03:09Z",
+  "updatedAt": "2026-11-14T19:03:09Z"
+}
+```
+
+#### Một phòng
+
+`GET /v1/rooms/room-a102` → **200**
+
+Request:
+```http
+GET https://roomkeepapi-ivory.vercel.app/v1/rooms/room-a102
+Authorization: Bearer <accessToken>
+```
+Response:
+```json
+{
+  "id": "room-a102",
+  "floorId": "flr-a1",
+  "typeId": null,
+  "name": "A102",
+  "areaSqm": 18.5,
+  "capacity": 2,
+  "status": "vacant",
+  "amenitiesText": null,
+  "note": null,
+  "isDemo": false,
+  "rev": 8,
+  "createdAt": "2026-11-14T19:03:09Z",
+  "updatedAt": "2026-11-14T19:03:09Z"
+}
+```
+
+#### Sửa phòng (có `rev` để chống ghi đè)
+
+`PATCH /v1/rooms/room-a102` → **200**
+
+Request:
+```http
+PATCH https://roomkeepapi-ivory.vercel.app/v1/rooms/room-a102
+Authorization: Bearer <accessToken>
+Content-Type: application/json
+```
+```json
+{
+  "status": "maintenance",
+  "note": "Sửa trần",
+  "rev": 8
+}
+```
+Response:
+```json
+{
+  "id": "room-a102",
+  "floorId": "flr-a1",
+  "typeId": null,
+  "name": "A102",
+  "areaSqm": 18.5,
+  "capacity": 2,
+  "status": "maintenance",
+  "amenitiesText": null,
+  "note": "Sửa trần",
+  "isDemo": false,
+  "rev": 9,
+  "createdAt": "2026-11-14T19:03:09Z",
+  "updatedAt": "2026-11-14T19:03:09Z"
+}
+```
+
+#### Tìm khách không dấu
+
+`GET /v1/tenants?q=tran thi` → **200**
+
+Request:
+```http
+GET https://roomkeepapi-ivory.vercel.app/v1/tenants?q=tran thi
+Authorization: Bearer <accessToken>
+```
+Response:
+```json
+{
+  "data": [
+    {
+      "id": "ten-2",
+      "name": "Trần Thị Bích",
+      "phone": "0900000102",
+      "workplaceText": null,
+      "vehicleText": null,
+      "segment": "long_term",
+      "emergencyContactText": null,
+      "note": null,
+      "isDemo": false,
+      "rev": 10,
+      "createdAt": "2026-11-14T19:03:09Z",
+      "updatedAt": "2026-11-14T19:03:09Z"
+    },
+    {
+      "id": "ten-3",
+      "name": "Trần Thị Thu",
+      "phone": "0900000103",
+      "workplaceText": null,
+      "vehicleText": null,
+      "segment": null,
+      "emergencyContactText": null,
+      "note": null,
+      "isDemo": false,
+      "rev": 11,
+      "createdAt": "2026-11-14T19:03:09Z",
+      "updatedAt": "2026-11-14T19:03:09Z"
+    }
+  ],
+  "page": {
+    "limit": 50,
+    "offset": 0,
+    "total": 2
+  }
+}
+```
+
+#### Tạo hợp đồng
+
+`POST /v1/contracts` → **201**
+
+Request:
+```http
+POST https://roomkeepapi-ivory.vercel.app/v1/contracts
+Authorization: Bearer <accessToken>
+Content-Type: application/json
+```
+```json
+{
+  "roomId": "room-a102",
+  "leaderTenantId": "ten-2",
+  "startDate": "2026-11-01",
+  "endDate": "2027-10-31",
+  "monthlyRent": 2500000,
+  "depositAmount": 2500000
+}
+```
+Response:
+```json
+{
+  "id": "81f73e3e-620d-4dea-b408-98c4684ca86a",
+  "roomId": "room-a102",
+  "leaderTenantId": "ten-2",
+  "startDate": "2026-11-01",
+  "endDate": "2027-10-31",
+  "monthlyRent": 2500000,
+  "depositAmount": 2500000,
+  "depositDate": null,
+  "extraTerms": null,
+  "status": "active",
+  "terminationReason": null,
+  "renewedFromId": null,
+  "isDemo": false,
+  "rev": 12,
+  "createdAt": "2026-11-14T19:03:09Z",
+  "updatedAt": "2026-11-14T19:03:09Z"
+}
+```
+
+#### Tạo bảng tính tiền
+
+`POST /v1/room-statements` → **201**
+
+Request:
+```http
+POST https://roomkeepapi-ivory.vercel.app/v1/room-statements
+Authorization: Bearer <accessToken>
+Content-Type: application/json
+```
+```json
+{
+  "cycleId": "483233d8-4344-4ed5-b197-1337aad2938b",
+  "roomId": "room-a102",
+  "contractId": "81f73e3e-620d-4dea-b408-98c4684ca86a",
+  "rentAmount": 2500000,
+  "electricAmount": 350000,
+  "waterAmount": 72000,
+  "feesAmount": 120000,
+  "totalAmount": 3042000
+}
+```
+Response:
+```json
+{
+  "id": "79a2295e-6406-4771-ac90-66bfeaf29c08",
+  "cycleId": "483233d8-4344-4ed5-b197-1337aad2938b",
+  "roomId": "room-a102",
+  "contractId": "81f73e3e-620d-4dea-b408-98c4684ca86a",
+  "rentAmount": 2500000,
+  "electricAmount": 350000,
+  "waterAmount": 72000,
+  "feesAmount": 120000,
+  "sharedAmount": null,
+  "discountAmount": null,
+  "adjustAmount": null,
+  "totalAmount": 3042000,
+  "prorationNote": null,
+  "missingReadings": false,
+  "paidAmount": 0,
+  "collectStatus": "unpaid",
+  "isDemo": false,
+  "rev": 14,
+  "createdAt": "2026-11-14T19:03:09Z",
+  "updatedAt": "2026-11-14T19:03:09Z"
+}
+```
+
+#### Bảng tính tiền sau một lần thu (`paidAmount`, `collectStatus` tính sẵn)
+
+`GET /v1/room-statements/79a2295e-6406-4771-ac90-66bfeaf29c08` → **200**
+
+Request:
+```http
+GET https://roomkeepapi-ivory.vercel.app/v1/room-statements/79a2295e-6406-4771-ac90-66bfeaf29c08
+Authorization: Bearer <accessToken>
+```
+Response:
+```json
+{
+  "id": "79a2295e-6406-4771-ac90-66bfeaf29c08",
+  "cycleId": "483233d8-4344-4ed5-b197-1337aad2938b",
+  "roomId": "room-a102",
+  "contractId": "81f73e3e-620d-4dea-b408-98c4684ca86a",
+  "rentAmount": 2500000,
+  "electricAmount": 350000,
+  "waterAmount": 72000,
+  "feesAmount": 120000,
+  "sharedAmount": null,
+  "discountAmount": null,
+  "adjustAmount": null,
+  "totalAmount": 3042000,
+  "prorationNote": null,
+  "missingReadings": false,
+  "paidAmount": 2000000,
+  "collectStatus": "partial",
+  "isDemo": false,
+  "rev": 14,
+  "createdAt": "2026-11-14T19:03:09Z",
+  "updatedAt": "2026-11-14T19:03:09Z"
+}
+```
+
+#### Cài đặt nhà trọ
+
+`GET /v1/settings` → **200**
+
+Request:
+```http
+GET https://roomkeepapi-ivory.vercel.app/v1/settings
+Authorization: Bearer <accessToken>
+```
+Response:
+```json
+{
+  "id": "main",
+  "language": null,
+  "propertyName": "Nhà trọ Hoa Sen",
+  "address": null,
+  "phone": null,
+  "meterDay": 28,
+  "cycleStartDay": null,
+  "dueDay": 5,
+  "dayCountMode": "fixed30",
+  "roundingStep": 1000,
+  "dateFormat": null,
+  "rulesText": null,
+  "theme": null,
+  "isDemo": false,
+  "rev": 1,
+  "createdAt": "2026-11-14T19:03:09Z",
+  "updatedAt": "2026-11-14T19:03:09Z"
+}
+```
+
+#### Xóa
+
+`DELETE /v1/blocks/blk-b` → **204**
+
+Request:
+```http
+DELETE https://roomkeepapi-ivory.vercel.app/v1/blocks/blk-b
+Authorization: Bearer <accessToken>
+```
+Response:
+```
+(không có body)
+```
+
+### 8.6 Mời quản lý
+
+#### Tạo mã mời (chủ trọ)
+
+`POST /v1/invites` → **201**
+
+Request:
+```http
+POST https://roomkeepapi-ivory.vercel.app/v1/invites
+Authorization: Bearer <accessToken>
+Content-Type: application/json
+```
+```json
+{
+  "role": "manager"
+}
+```
+Response:
+```json
+{
+  "id": "ac058549-b9f3-4dd4-932a-8795353b520e",
+  "code": "LJGZCHZ5",
+  "role": "manager",
+  "expiresAt": "2026-11-16T19:03:09Z",
+  "createdAt": "2026-11-14T19:03:09Z",
+  "status": "active",
+  "usedAt": null
+}
+```
+
+#### Đăng ký bằng mã mời
+
+`POST /v1/auth/register` → **201**
+
+Request:
+```http
+POST https://roomkeepapi-ivory.vercel.app/v1/auth/register
+Content-Type: application/json
+```
+```json
+{
+  "account": {
+    "email": "quanly@example.com",
+    "password": "Matkhau2026",
+    "displayName": "Quản lý Hùng"
+  },
+  "acceptTerms": true,
+  "inviteCode": "LJGZCHZ5",
+  "deviceName": "Redmi 13"
+}
+```
+Response:
+```json
+{
+  "account": {
+    "id": "082a00b2-0c06-476a-b146-e8cb65c0d563",
+    "email": "quanly@example.com",
+    "phone": null,
+    "displayName": "Quản lý Hùng",
+    "preferredLanguage": "vi",
+    "role": "manager",
+    "propertyId": "d2947763-4109-45f1-bf1c-35a44fbdfb99",
+    "createdAt": "2026-11-14T19:03:09Z"
+  },
+  "property": {
+    "id": "d2947763-4109-45f1-bf1c-35a44fbdfb99",
+    "name": "Nhà trọ Hoa Sen",
+    "address": "12 Lê Lợi",
+    "phone": "0901234567",
+    "ownerId": "bd0b1695-6a3e-4fc2-bab7-a6bd5f68fc5f",
+    "createdAt": "2026-11-14T19:03:08Z"
+  },
+  "role": "manager",
+  "tokens": {
+    "tokenType": "Bearer",
+    "accessToken": "eyJhbGciOiJIUzI1NiIsInR5…",
+    "accessTokenExpiresAt": "2026-11-14T21:03:09Z",
+    "expiresIn": 7200,
+    "refreshToken": "eb626049-ebd1-46f8-93cc-…",
+    "refreshTokenExpiresAt": "2026-11-14T22:03:09Z",
+    "sessionExpiresAt": "2026-11-15T07:03:09Z",
+    "deviceId": "eb626049-ebd1-46f8-93cc-9a35f6575ee0"
+  },
+  "changes": [
+    {
+      "table": "AppSettings",
+      "id": "main",
+      "rev": 1,
+      "op": "upsert",
+      "isDeleted": false,
+      "updatedAt": "2026-11-15T08:00:00Z",
+      "serverUpdatedAt": "2026-11-14T19:03:09Z",
+      "payload": {
+        "propertyName": "Nhà trọ Hoa Sen",
+        "meterDay": 28,
+        "dueDay": 5,
+        "dayCountMode": "fixed30",
+        "roundingStep": 1000,
+        "elecPrice": 3500,
+        "isDemo": false,
+        "id": "main",
+        "isDeleted": false
+      }
+    },
+    {
+      "table": "Block",
+      "id": "blk-a",
+      "rev": 2,
+      "op": "upsert",
+      "isDeleted": false,
+      "updatedAt": null,
+      "serverUpdatedAt": "2026-11-14T19:03:09Z",
+      "payload": {
+        "name": "Dãy A",
+        "sortOrder": 0,
+        "isDemo": false,
+        "id": "blk-a",
+        "isDeleted": false
+      }
+    },
+    {
+      "table": "Floor",
+      "id": "flr-a1",
+      "rev": 3,
+      "op": "upsert",
+      "isDeleted": false,
+      "updatedAt": null,
+      "serverUpdatedAt": "2026-11-14T19:03:09Z",
+      "payload": {
+        "blockId": "blk-a",
+        "label": "Tầng 1",
+        "sortOrder": 0,
+        "isDemo": false,
+        "id": "flr-a1",
+        "isDeleted": false
+      }
+    }
+  ],
+  "rev": 17,
+  "hasMore": false
+}
+```
+* `changes` có 11 phần tử, chỉ hiện 3 phần tử đầu.
+
+#### Danh sách thành viên
+
+`GET /v1/members` → **200**
+
+Request:
+```http
+GET https://roomkeepapi-ivory.vercel.app/v1/members
+Authorization: Bearer <accessToken>
+```
+Response:
+```json
+{
+  "members": [
+    {
+      "accountId": "bd0b1695-6a3e-4fc2-bab7-a6bd5f68fc5f",
+      "displayName": "Cô Lan Anh",
+      "email": "chu@example.com",
+      "role": "owner",
+      "joinedAt": "2026-11-14T19:03:08Z"
+    },
+    {
+      "accountId": "082a00b2-0c06-476a-b146-e8cb65c0d563",
+      "displayName": "Quản lý Hùng",
+      "email": "quanly@example.com",
+      "role": "manager",
+      "joinedAt": "2026-11-14T19:03:09Z"
+    }
+  ]
+}
+```
+
+### 8.7 Thu chi (ghi chép)
+
+Các bảng thu chi dùng CRUD chung (mục 7). `cash-entries`, `expenses`, `utility-bills`, `reserve-fund-entries`, `investments`, `targets`, `staff-pays` **chỉ chủ trọ** (quản lý nhận `403 forbidden`). `collections`, `deposit-entries` chỉ ghi thêm (không PATCH). Lọc theo tháng bằng `?from=yyyy-MM-01&to=yyyy-MM-31` trên ngày chính của bảng, hoặc `?cycle=yyyy-MM` với bảng có trường `cycle`.
+
+#### Ghi một lần thu tiền phòng
+
+`POST /v1/collections` → **201**
+
+Request:
+```http
+POST https://roomkeepapi-ivory.vercel.app/v1/collections
+Authorization: Bearer <accessToken>
+Content-Type: application/json
+```
+```json
+{
+  "statementId": "79a2295e-6406-4771-ac90-66bfeaf29c08",
+  "amount": 1042000,
+  "paidAt": "2026-11-10",
+  "methodNote": "Chuyển khoản"
+}
+```
+Response:
+```json
+{
+  "id": "edf8dce7-d6de-49fb-adbf-8460fdb41c83",
+  "statementId": "79a2295e-6406-4771-ac90-66bfeaf29c08",
+  "amount": 1042000,
+  "paidAt": "2026-11-10",
+  "methodNote": "Chuyển khoản",
+  "isDemo": false,
+  "rev": 18,
+  "createdAt": "2026-11-14T19:03:09Z",
+  "updatedAt": "2026-11-14T19:03:09Z"
+}
+```
+
+#### Các lần thu của một bảng tính tiền
+
+`GET /v1/collections?statementId=79a2295e-6406-4771-ac90-66bfeaf29c08` → **200**
+
+Request:
+```http
+GET https://roomkeepapi-ivory.vercel.app/v1/collections?statementId=79a2295e-6406-4771-ac90-66bfeaf29c08
+Authorization: Bearer <accessToken>
+```
+Response:
+```json
+{
+  "data": [
+    {
+      "id": "edf8dce7-d6de-49fb-adbf-8460fdb41c83",
+      "statementId": "79a2295e-6406-4771-ac90-66bfeaf29c08",
+      "amount": 1042000,
+      "paidAt": "2026-11-10",
+      "methodNote": "Chuyển khoản",
+      "isDemo": false,
+      "rev": 18,
+      "createdAt": "2026-11-14T19:03:09Z",
+      "updatedAt": "2026-11-14T19:03:09Z"
+    },
+    {
+      "id": "01a338b4-7765-448a-a51b-f994462175b3",
+      "statementId": "79a2295e-6406-4771-ac90-66bfeaf29c08",
+      "amount": 2000000,
+      "paidAt": "2026-11-05",
+      "methodNote": "Tiền mặt",
+      "isDemo": false,
+      "rev": 15,
+      "createdAt": "2026-11-14T19:03:09Z",
+      "updatedAt": "2026-11-14T19:03:09Z"
+    }
+  ],
+  "page": {
+    "limit": 50,
+    "offset": 0,
+    "total": 2
+  }
+}
+```
+
+#### Sổ cọc của một hợp đồng
+
+`GET /v1/deposit-entries?contractId=81f73e3e-620d-4dea-b408-98c4684ca86a` → **200**
+
+Request:
+```http
+GET https://roomkeepapi-ivory.vercel.app/v1/deposit-entries?contractId=81f73e3e-620d-4dea-b408-98c4684ca86a
+Authorization: Bearer <accessToken>
+```
+Response:
+```json
+{
+  "data": [
+    {
+      "id": "be8b5e21-501a-45d9-b97d-414cb1f48e82",
+      "contractId": "81f73e3e-620d-4dea-b408-98c4684ca86a",
+      "type": "receive",
+      "amount": 2500000,
+      "date": "2026-11-01",
+      "reason": "Nhận cọc khi ký hợp đồng",
+      "isDemo": false,
+      "rev": 19,
+      "createdAt": "2026-11-14T19:03:09Z",
+      "updatedAt": "2026-11-14T19:03:09Z"
+    }
+  ],
+  "page": {
+    "limit": 50,
+    "offset": 0,
+    "total": 1
+  }
+}
+```
+
+#### Ghi một khoản chi
+
+`POST /v1/expenses` → **201**
+
+Request:
+```http
+POST https://roomkeepapi-ivory.vercel.app/v1/expenses
+Authorization: Bearer <accessToken>
+Content-Type: application/json
+```
+```json
+{
+  "category": "Điện tổng",
+  "amount": 3650000,
+  "date": "2026-11-03",
+  "isRecurring": true,
+  "note": "Hóa đơn EVN tháng 10"
+}
+```
+Response:
+```json
+{
+  "id": "e5a2a360-3ecf-4b84-bf6b-54d05e58855c",
+  "category": "Điện tổng",
+  "amount": 3650000,
+  "date": "2026-11-03",
+  "isRecurring": true,
+  "note": "Hóa đơn EVN tháng 10",
+  "isDemo": false,
+  "rev": 20,
+  "createdAt": "2026-11-14T19:03:09Z",
+  "updatedAt": "2026-11-14T19:03:09Z"
+}
+```
+
+#### Chi phí trong tháng 11
+
+`GET /v1/expenses?from=2026-11-01&to=2026-11-30&sort=-date` → **200**
+
+Request:
+```http
+GET https://roomkeepapi-ivory.vercel.app/v1/expenses?from=2026-11-01&to=2026-11-30&sort=-date
+Authorization: Bearer <accessToken>
+```
+Response:
+```json
+{
+  "data": [
+    {
+      "id": "90793393-1c4a-4cd7-9e68-7b17259bbcbc",
+      "category": "Sửa chữa",
+      "amount": 350000,
+      "date": "2026-11-08",
+      "isRecurring": false,
+      "note": "Nạp gas máy lạnh A201",
+      "isDemo": false,
+      "rev": 23,
+      "createdAt": "2026-11-14T19:03:09Z",
+      "updatedAt": "2026-11-14T19:03:09Z"
+    },
+    {
+      "id": "e5a2a360-3ecf-4b84-bf6b-54d05e58855c",
+      "category": "Điện tổng",
+      "amount": 3650000,
+      "date": "2026-11-03",
+      "isRecurring": true,
+      "note": "Hóa đơn EVN tháng 10",
+      "isDemo": false,
+      "rev": 20,
+      "createdAt": "2026-11-14T19:03:09Z",
+      "updatedAt": "2026-11-14T19:03:09Z"
+    },
+    {
+      "id": "ac91a672-8693-4ca2-b21f-1b0fe722caac",
+      "category": "Nước tổng",
+      "amount": 760000,
+      "date": "2026-11-03",
+      "isRecurring": true,
+      "note": "Hóa đơn nước tháng 10",
+      "isDemo": false,
+      "rev": 21,
+      "createdAt": "2026-11-14T19:03:09Z",
+      "updatedAt": "2026-11-14T19:03:09Z"
+    }
+  ],
+  "page": {
+    "limit": 50,
+    "offset": 0,
+    "total": 4
+  }
+}
+```
+* `data` có 4 phần tử, chỉ hiện 3 phần tử đầu.
+
+#### Sổ thu chi tiền mặt
+
+`GET /v1/cash-entries?sort=-date` → **200**
+
+Request:
+```http
+GET https://roomkeepapi-ivory.vercel.app/v1/cash-entries?sort=-date
+Authorization: Bearer <accessToken>
+```
+Response:
+```json
+{
+  "data": [
+    {
+      "id": "cb344b96-ba74-4704-99f9-1a7f065e1565",
+      "type": "in",
+      "amount": 500000,
+      "reason": "Cọc giữ chỗ A204",
+      "date": "2026-11-12",
+      "isDemo": false,
+      "rev": 24,
+      "createdAt": "2026-11-14T19:03:09Z",
+      "updatedAt": "2026-11-14T19:03:09Z"
+    },
+    {
+      "id": "29a5e126-6951-4d7f-a3a7-5e5aa0646826",
+      "type": "out",
+      "amount": 180000,
+      "reason": "Mua bóng đèn hành lang",
+      "date": "2026-11-07",
+      "isDemo": false,
+      "rev": 25,
+      "createdAt": "2026-11-14T19:03:09Z",
+      "updatedAt": "2026-11-14T19:03:09Z"
+    }
+  ],
+  "page": {
+    "limit": 50,
+    "offset": 0,
+    "total": 2
+  }
+}
+```
+
+#### Chỉ các khoản chi tiền mặt
+
+`GET /v1/cash-entries?type=out` → **200**
+
+Request:
+```http
+GET https://roomkeepapi-ivory.vercel.app/v1/cash-entries?type=out
+Authorization: Bearer <accessToken>
+```
+Response:
+```json
+{
+  "data": [
+    {
+      "id": "29a5e126-6951-4d7f-a3a7-5e5aa0646826",
+      "type": "out",
+      "amount": 180000,
+      "reason": "Mua bóng đèn hành lang",
+      "date": "2026-11-07",
+      "isDemo": false,
+      "rev": 25,
+      "createdAt": "2026-11-14T19:03:09Z",
+      "updatedAt": "2026-11-14T19:03:09Z"
+    }
+  ],
+  "page": {
+    "limit": 50,
+    "offset": 0,
+    "total": 1
+  }
+}
+```
+
+#### Điện nước tổng của kỳ
+
+`GET /v1/utility-bills?cycle=2026-10` → **200**
+
+Request:
+```http
+GET https://roomkeepapi-ivory.vercel.app/v1/utility-bills?cycle=2026-10
+Authorization: Bearer <accessToken>
+```
+Response:
+```json
+{
+  "data": [
+    {
+      "id": "459b0276-5d15-4445-b0f6-e8b2438af9e4",
+      "cycle": "2026-10",
+      "kind": "electric",
+      "totalAmount": 3650000,
+      "totalUnits": 820,
+      "isDemo": false,
+      "rev": 26,
+      "createdAt": "2026-11-14T19:03:09Z",
+      "updatedAt": "2026-11-14T19:03:09Z"
+    },
+    {
+      "id": "d515d20d-1e03-4421-bff5-90173a840a2e",
+      "cycle": "2026-10",
+      "kind": "water",
+      "totalAmount": 760000,
+      "totalUnits": 33,
+      "isDemo": false,
+      "rev": 27,
+      "createdAt": "2026-11-14T19:03:09Z",
+      "updatedAt": "2026-11-14T19:03:09Z"
+    }
+  ],
+  "page": {
+    "limit": 50,
+    "offset": 0,
+    "total": 2
+  }
+}
+```
+
+#### Quỹ dự phòng sửa chữa
+
+`GET /v1/reserve-fund-entries` → **200**
+
+Request:
+```http
+GET https://roomkeepapi-ivory.vercel.app/v1/reserve-fund-entries
+Authorization: Bearer <accessToken>
+```
+Response:
+```json
+{
+  "data": [
+    {
+      "id": "9f912141-0da0-4a48-ba37-93bc27aeb0d6",
+      "type": "out",
+      "amount": 650000,
+      "date": "2026-11-10",
+      "reason": "Thay khóa, sơn phòng A104",
+      "isDemo": false,
+      "rev": 29,
+      "createdAt": "2026-11-14T19:03:09Z",
+      "updatedAt": "2026-11-14T19:03:09Z"
+    },
+    {
+      "id": "ebd0e968-98cc-47f9-8626-3c7db81dc939",
+      "type": "in",
+      "amount": 500000,
+      "date": "2026-10-31",
+      "reason": "Trích quỹ tháng 10",
+      "isDemo": false,
+      "rev": 28,
+      "createdAt": "2026-11-14T19:03:09Z",
+      "updatedAt": "2026-11-14T19:03:09Z"
+    }
+  ],
+  "page": {
+    "limit": 50,
+    "offset": 0,
+    "total": 2
+  }
+}
+```
+
+#### Lương nhân viên theo kỳ
+
+`GET /v1/staff-pays?cycle=2026-10` → **200**
+
+Request:
+```http
+GET https://roomkeepapi-ivory.vercel.app/v1/staff-pays?cycle=2026-10
+Authorization: Bearer <accessToken>
+```
+Response:
+```json
+{
+  "data": [
+    {
+      "id": "5def56a3-e2d1-472b-9cc5-3367d49408e0",
+      "staffId": "f81f2dd0-1e17-4780-9e12-4807a5320df7",
+      "cycle": "2026-10",
+      "amount": 1500000,
+      "note": "Lương tháng 10",
+      "isDemo": false,
+      "rev": 31,
+      "createdAt": "2026-11-14T19:03:09Z",
+      "updatedAt": "2026-11-14T19:03:09Z"
+    }
+  ],
+  "page": {
+    "limit": 50,
+    "offset": 0,
+    "total": 1
+  }
+}
+```
+
+#### Chi phí đầu tư
+
+`GET /v1/investments` → **200**
+
+Request:
+```http
+GET https://roomkeepapi-ivory.vercel.app/v1/investments
+Authorization: Bearer <accessToken>
+```
+Response:
+```json
+{
+  "data": [
+    {
+      "id": "f19f45dd-64c3-4bce-a698-ce15dbd4e92a",
+      "roomId": null,
+      "amount": 48000000,
+      "date": "2025-01-01",
+      "note": "Lắp 8 máy lạnh",
+      "isDemo": false,
+      "rev": 32,
+      "createdAt": "2026-11-14T19:03:09Z",
+      "updatedAt": "2026-11-14T19:03:09Z"
+    }
+  ],
+  "page": {
+    "limit": 50,
+    "offset": 0,
+    "total": 1
+  }
+}
+```
+
+#### Mục tiêu doanh thu
+
+`GET /v1/targets` → **200**
+
+Request:
+```http
+GET https://roomkeepapi-ivory.vercel.app/v1/targets
+Authorization: Bearer <accessToken>
+```
+Response:
+```json
+{
+  "data": [
+    {
+      "id": "a44194d2-b399-44ed-bb41-4dde93e21ed8",
+      "month": "2026-11",
+      "targetRevenue": 20000000,
+      "isDemo": false,
+      "rev": 33,
+      "createdAt": "2026-11-14T19:03:09Z",
+      "updatedAt": "2026-11-14T19:03:09Z"
+    }
+  ],
+  "page": {
+    "limit": 50,
+    "offset": 0,
+    "total": 1
+  }
+}
+```
+
+#### Quản lý xem chi phí → bị chặn
+
+`GET /v1/expenses` → **403**
+
+Request:
+```http
+GET https://roomkeepapi-ivory.vercel.app/v1/expenses
+Authorization: Bearer <accessToken>
+```
+Response:
+```json
+{
+  "code": "forbidden",
+  "message": "Bạn không có quyền thực hiện thao tác này",
+  "requestId": "req_07e5c9a8a571"
+}
+```
+
+### 8.8 Lỗi thường gặp
+
+#### Thiếu token
+
+`GET /v1/me` → **401**
+
+Response:
+```json
+{
+  "code": "unauthorized",
+  "message": "Bạn cần đăng nhập để tiếp tục",
+  "requestId": "req_ed2e48360a56"
+}
+```
+
+#### Access token hết hạn → gọi `/auth/refresh` rồi gửi lại
+
+`GET /v1/me` → **401**
+
+Request:
+```http
+GET https://roomkeepapi-ivory.vercel.app/v1/me
+Authorization: Bearer <accessToken>
+```
+Response:
+```json
+{
+  "code": "token_expired",
+  "message": "Phiên truy cập đã hết hạn",
+  "requestId": "req_a4c26b537d1f"
+}
+```
+
+#### Refresh token sai hoặc đã bị thu hồi → về màn hình đăng nhập
+
+`POST /v1/auth/refresh` → **401**
+
+Request:
+```http
+POST https://roomkeepapi-ivory.vercel.app/v1/auth/refresh
+Content-Type: application/json
+```
+```json
+{
+  "refreshToken": "abc.def"
+}
+```
+Response:
+```json
+{
+  "code": "refresh_invalid",
+  "message": "Không thể làm mới phiên, vui lòng đăng nhập lại",
+  "requestId": "req_b15e18d5e01f"
+}
+```
+* Gửi lại một refresh token cũ (đã đổi) thì `code` là `refresh_reused` và cả phiên bị thu hồi; xử lý giống nhau: về màn hình đăng nhập, giữ dữ liệu trên máy.
+
+#### Sai mật khẩu
+
+`POST /v1/auth/login` → **401**
+
+Request:
+```http
+POST https://roomkeepapi-ivory.vercel.app/v1/auth/login
+Content-Type: application/json
+```
+```json
+{
+  "email": "chu@example.com",
+  "password": "sai123456"
+}
+```
+Response:
+```json
+{
+  "code": "invalid_credentials",
+  "message": "Email/số điện thoại hoặc mật khẩu không đúng",
+  "requestId": "req_add7678bf891"
+}
+```
+
+#### Dữ liệu không hợp lệ
+
+`POST /v1/auth/register` → **400**
+
+Request:
+```http
+POST https://roomkeepapi-ivory.vercel.app/v1/auth/register
+Accept-Language: vi
+Content-Type: application/json
+```
+```json
+{
+  "account": {
+    "email": "sai-email",
+    "password": "abc",
+    "displayName": ""
+  },
+  "property": {
+    "name": ""
+  }
+}
+```
+Response:
+```json
+{
+  "code": "validation_failed",
+  "message": "Dữ liệu không hợp lệ",
+  "fields": [
+    {
+      "field": "account.email",
+      "code": "invalid_format"
+    },
+    {
+      "field": "account.password",
+      "code": "weak_password"
+    },
+    {
+      "field": "account.displayName",
+      "code": "required"
+    }
+  ],
+  "requestId": "req_2ed5e71b8d57"
+}
+```
+* `fields` có 5 phần tử, chỉ hiện 3 phần tử đầu.
+
+#### SĐT nhà trọ đã được nhà trọ khác dùng
+
+`POST /v1/auth/register` → **409**
+
+Request:
+```http
+POST https://roomkeepapi-ivory.vercel.app/v1/auth/register
+Content-Type: application/json
+```
+```json
+{
+  "account": {
+    "email": "khac@example.com",
+    "password": "Matkhau2026",
+    "displayName": "Y"
+  },
+  "acceptTerms": true,
+  "seed": false,
+  "property": {
+    "name": "Y",
+    "phone": "+84 901 234 567"
+  }
+}
+```
+Response:
+```json
+{
+  "code": "phone_taken",
+  "message": "Số điện thoại này đã được dùng cho tài khoản khác",
+  "fields": [
+    {
+      "field": "property.phone",
+      "code": "phone_taken"
+    }
+  ],
+  "requestId": "req_6e102f75ea45"
+}
+```
+
+#### Email đã đăng ký
+
+`POST /v1/auth/register` → **409**
+
+Request:
+```http
+POST https://roomkeepapi-ivory.vercel.app/v1/auth/register
+Content-Type: application/json
+```
+```json
+{
+  "account": {
+    "email": "chu@example.com",
+    "password": "Matkhau2026",
+    "displayName": "X"
+  },
+  "acceptTerms": true,
+  "seed": false,
+  "property": {
+    "name": "X"
+  }
+}
+```
+Response:
+```json
+{
+  "code": "email_taken",
+  "message": "Email này đã được đăng ký",
+  "requestId": "req_cfd5439e1ef1"
+}
+```
+
+#### Sửa đè bản cũ (CRUD)
+
+`PATCH /v1/rooms/room-a102` → **409**
+
+Request:
+```http
+PATCH https://roomkeepapi-ivory.vercel.app/v1/rooms/room-a102
+Authorization: Bearer <accessToken>
+Content-Type: application/json
+```
+```json
+{
+  "note": "x",
+  "rev": 1
+}
+```
+Response:
+```json
+{
+  "code": "version_conflict",
+  "message": "Bản ghi đã được sửa ở nơi khác, hãy tải lại rồi sửa tiếp",
+  "current": {
+    "id": "room-a102",
+    "floorId": "flr-a1",
+    "typeId": null,
+    "name": "A102",
+    "areaSqm": 18.5,
+    "capacity": 2,
+    "status": "maintenance",
+    "amenitiesText": null,
+    "note": "Sửa trần",
+    "isDemo": false,
+    "rev": 9,
+    "createdAt": "2026-11-14T19:03:09Z",
+    "updatedAt": "2026-11-14T19:03:09Z"
+  },
+  "requestId": "req_56ff4fe040d6"
+}
+```
+
+#### Xóa khi còn dữ liệu liên kết
+
+`DELETE /v1/rooms/room-a102` → **409**
+
+Request:
+```http
+DELETE https://roomkeepapi-ivory.vercel.app/v1/rooms/room-a102
+Authorization: Bearer <accessToken>
+```
+Response:
+```json
+{
+  "code": "has_dependents",
+  "message": "Không thể xóa vì còn dữ liệu đang liên kết",
+  "blockedBy": [
+    {
+      "resource": "contracts",
+      "field": "roomId",
+      "count": 1
+    },
+    {
+      "resource": "room-statements",
+      "field": "roomId",
+      "count": 1
+    }
+  ],
+  "requestId": "req_43525df21b72"
+}
+```
+
+#### Không tìm thấy
+
+`GET /v1/rooms/khong-co` → **404**
+
+Request:
+```http
+GET https://roomkeepapi-ivory.vercel.app/v1/rooms/khong-co
+Authorization: Bearer <accessToken>
+```
+Response:
+```json
+{
+  "code": "not_found",
+  "message": "Không tìm thấy",
+  "requestId": "req_19d130688ac9"
+}
+```
+
+#### App quá cũ
+
+`GET /v1/me` → **426**
+
+Request:
+```http
+GET https://roomkeepapi-ivory.vercel.app/v1/me
+Authorization: Bearer <accessToken>
+X-App-Version: 0.9.0
+```
+Response:
+```json
+{
+  "code": "upgrade_required",
+  "message": "Phiên bản ứng dụng quá cũ, vui lòng cập nhật",
+  "minAppVersion": "1.0.0",
+  "latestAppVersion": "1.0.0",
+  "requestId": "req_359571f1aacf"
+}
+```
+
+<!-- EXAMPLES:END -->

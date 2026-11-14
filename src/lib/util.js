@@ -47,6 +47,19 @@ function compareVersions(a, b) {
   return 0;
 }
 
+/**
+ * Vietnamese phone number used as a login: "0901 234 567", "+84 901234567", "84901234567" -> "0901234567".
+ * Returns null when it is not a plausible number (10-11 digits starting with 0 after normalization).
+ */
+function normalizePhone(s) {
+  if (typeof s !== 'string') return null;
+  let d = s.replace(/[\s.\-()]/g, '');
+  if (d.startsWith('+')) d = d.slice(1);
+  if (!/^\d+$/.test(d)) return null;
+  if (d.startsWith('84') && d.length >= 11) d = `0${d.slice(2)}`;
+  return /^0\d{9,10}$/.test(d) ? d : null;
+}
+
 const iso = (d) => (d ? new Date(d).toISOString().replace(/\.\d{3}Z$/, 'Z') : null);
 
-module.exports = { uuid, sha256, randomToken, humanCode, normalizeCode, safeEqual, noAccent, today, compareVersions, iso };
+module.exports = { uuid, sha256, randomToken, humanCode, normalizeCode, safeEqual, noAccent, today, compareVersions, iso, normalizePhone };

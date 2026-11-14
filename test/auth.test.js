@@ -1,7 +1,7 @@
 const { test, before, after, beforeEach } = require('node:test');
 const assert = require('node:assert/strict');
 const request = require('supertest');
-const { start, stop, reset, api, app, register, login, PASSWORD } = require('./helpers');
+const { start, stop, reset, api, app, register, login, PASSWORD, phoneFor } = require('./helpers');
 const { Session } = require('../src/models');
 
 before(start);
@@ -151,6 +151,55 @@ test('login, wrong password lockout, me', async () => {
   const locked = await api.post('auth/login', { email: 'a@example.com', password: PASSWORD }).expect(429);
   assert.equal(locked.body.code, 'too_many_attempts');
   assert.ok(Number(locked.headers['retry-after']) > 0);
+});
+
+test('login with email or the property phone (owner); phone follows the property phone; managers use email', async () => {
+  const r = (await api.post('auth/register', {
+    account: { email: 'lan@example.com', password: PASSWORD, displayName: 'Cô Lan' }, acceptTerms: true,
+    property: { name: 'Trọ Lan', phone: '0901 234 567' }, deviceName: 'Pixel',
+  }).expect(201)).body;
+  assert.equal(r.account.phone, '0901234567');
+
+  for (const login of ['0901234567', '+84 901 234 567', '84901234567', '090.123.4567', 'LAN@example.com']) {
+    const b = (await api.post('auth/login', { login, password: PASSWORD }).expect(200)).body;
+    assert.equal(b.account.email, 'lan@example.com', login);
+  }
+  await api.post('auth/login', { email: 'lan@example.com', password: PASSWORD }).expect(200); // older field still works
+  assert.equal((await api.post('auth/login', { login: '0901234567', password: 'sai123456' }).expect(401)).body.code, 'invalid_credentials');
+  assert.equal((await api.post('auth/login', { login: '0999999999', password: PASSWORD }).expect(401)).body.code, 'invalid_credentials');
+  assert.deepEqual((await api.post('auth/login', { login: '12ab', password: PASSWORD }).expect(400)).body.fields, [{ field: 'login', code: 'invalid_format' }]);
+  assert.deepEqual((await api.post('auth/login', { password: PASSWORD }).expect(400)).body.fields[0], { field: 'email', code: 'required' });
+
+  // the same phone cannot be used by a second property
+  const dup = (await api.post('auth/register', { account: { email: 'other@example.com', password: PASSWORD, displayName: 'X' }, acceptTerms: true, property: { name: 'X', phone: '+84901234567' } }).expect(409)).body;
+  assert.equal(dup.code, 'phone_taken');
+  assert.deepEqual(dup.fields, [{ field: 'property.phone', code: 'phone_taken' }]);
+
+  // changing the property phone changes the login phone
+  const t = r.tokens.accessToken;
+  assert.equal((await api.patch('me', { phone: '0912 345 678' }, t).expect(200)).body.account.phone, '0912345678');
+  await api.post('auth/login', { login: '0901234567', password: PASSWORD }).expect(401);
+  await api.post('auth/login', { login: '0912345678', password: PASSWORD }).expect(200);
+  // ...also when the app pushes AppSettings, or through PATCH /settings
+  const s = (await api.get('sync/pull?since=0&tables=AppSettings', t)).body.changes[0];
+  await api.post('sync/push', { changes: [{ table: 'AppSettings', id: 'main', op: 'upsert', baseRev: s.rev, payload: { ...s.payload, phone: '0933 000 111' } }] }, t).expect(200);
+  await api.post('auth/login', { login: '0933000111', password: PASSWORD }).expect(200);
+  await api.patch('settings', { phone: '0944000222' }, t).expect(200);
+  await api.post('auth/login', { login: '0944000222', password: PASSWORD }).expect(200);
+  // another owner's phone is refused on PATCH /me
+  await register('b@example.com');
+  assert.equal((await api.patch('me', { phone: phoneFor('b@example.com') }, t).expect(409)).body.code, 'phone_taken');
+
+  // a manager has no login phone: the property phone still signs in the owner
+  const inv = (await api.post('invites', {}, t).expect(201)).body;
+  const m = (await api.post('auth/register', { account: { email: 'ql@example.com', password: PASSWORD, displayName: 'QL' }, acceptTerms: true, inviteCode: inv.code }).expect(201)).body;
+  assert.equal(m.account.phone, null);
+  assert.equal((await api.post('auth/login', { login: '0944000222', password: PASSWORD }).expect(200)).body.role, 'owner');
+
+  // forgot password stays email-only; the web deletion page accepts the phone
+  assert.deepEqual((await api.post('auth/forgot', { email: '0944000222' }).expect(400)).body.fields, [{ field: 'email', code: 'invalid_format' }]);
+  assert.ok((await api.post('auth/forgot', { email: 'lan@example.com' }).expect(202)).body.devToken);
+  await request(app).post('/account/delete').type('form').send({ email: '0944000222', password: 'sai123456', confirm: 'yes' }).expect(401);
 });
 
 test('refresh rotates; reusing the old refresh token revokes the session', async () => {

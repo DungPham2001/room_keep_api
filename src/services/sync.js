@@ -15,11 +15,11 @@
  * - Manager: owner-only tables are rejected on push and never returned on pull.
  */
 const config = require('../config');
-const { Property, SyncRecord, Receipt } = require('../models');
+const { Property, SyncRecord, Receipt, Account } = require('../models');
 const { withTx } = require('../lib/tx');
 const { Checker, isObj } = require('../lib/validate');
 const { AppError, conflict, notFound } = require('../lib/errors');
-const { iso } = require('../lib/util');
+const { iso, normalizePhone } = require('../lib/util');
 const { SYNC_TABLES, APPEND_ONLY, OWNER_ONLY, CYCLE_BOUND, APP_SETTINGS_ID, visibleTables } = require('./tables');
 const { validate, derive, searchText } = require('../resources/validate');
 const { REFERENCED_BY } = require('../resources/schema');
@@ -332,6 +332,7 @@ async function applyChanges(auth, changes, { deviceId = null } = {}) {
       if (typeof mirrorSettings.phone === 'string') set.phone = mirrorSettings.phone.slice(0, 20);
     }
     await Property.updateOne({ _id: propertyId }, { $set: set }, { session });
+    if (set.phone !== undefined) await syncOwnerPhone(property.ownerId, set.phone, session);
 
     return { accepted, conflicts, rejected, newRev: rev, view };
   });
@@ -350,6 +351,16 @@ async function push(auth, body) {
   const clean = changes.map((ch) => (isObj(ch) ? Object.fromEntries(SYNC_KEYS.filter((k) => k in ch).map((k) => [k, ch[k]])) : ch));
   const { accepted, conflicts, rejected, newRev } = await applyChanges(auth, clean, { deviceId });
   return { accepted, conflicts, rejected, newRev };
+}
+
+/**
+ * The owner signs in with the property phone: keep accounts.phone equal to it. If another account already uses that
+ * number, the login phone is left unchanged (the property phone itself is still saved).
+ */
+async function syncOwnerPhone(ownerId, rawPhone, session) {
+  const phone = normalizePhone(rawPhone || '') || null;
+  if (phone && (await Account.exists({ phone, _id: { $ne: ownerId } }).session(session))) return;
+  await Account.updateOne({ _id: ownerId }, { $set: { phone } }, { session });
 }
 
 /**

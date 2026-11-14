@@ -19,6 +19,7 @@ const make = (name, collection, def, indexes = []) => {
 const Account = make('Account', 'accounts', {
   _id: String, // uuid
   email: { type: String, required: true },
+  phone: { type: String, default: null }, // normalized login phone (0xxxxxxxxx), unique when set
   passwordHash: { type: String, required: true },
   displayName: { type: String, required: true },
   preferredLanguage: { type: String, enum: ['vi', 'en'], default: 'vi' },
@@ -31,6 +32,7 @@ const Account = make('Account', 'accounts', {
   updatedAt: { type: Date, default: Date.now },
 }, [
   [{ email: 1 }, { unique: true }],
+  [{ phone: 1 }, { unique: true, partialFilterExpression: { phone: { $type: 'string' } } }],
   [{ propertyId: 1, role: 1 }, {}],
 ]);
 

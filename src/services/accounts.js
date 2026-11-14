@@ -6,7 +6,7 @@ const { Account, Property, Session, PasswordReset, Invite, SyncRecord, Receipt }
 const { withTx } = require('../lib/tx');
 const { Checker } = require('../lib/validate');
 const { AppError, unauthorized, forbidden, conflict, notFound, invalid } = require('../lib/errors');
-const { uuid, sha256, humanCode, normalizeCode, iso } = require('../lib/util');
+const { uuid, sha256, humanCode, normalizeCode, iso, normalizePhone } = require('../lib/util');
 const password = require('../lib/password');
 const attempts = require('../lib/attempts');
 const mailer = require('../lib/mailer');
@@ -21,6 +21,7 @@ const LANGS = ['vi', 'en'];
 const presentAccount = (a) => ({
   id: a._id,
   email: a.email,
+  phone: a.phone || null,
   displayName: a.displayName,
   preferredLanguage: a.preferredLanguage,
   role: a.role || null,
@@ -43,6 +44,37 @@ async function profile(account) {
 }
 
 const loadAccount = (id) => Account.findById(id).lean();
+
+/**
+ * Login phone = the property phone, for the owner only (managers sign in by email).
+ * Returns the normalized phone, or null when the property phone is empty / not a phone number.
+ */
+const loginPhoneOf = (propertyPhone) => normalizePhone(propertyPhone || '') || null;
+
+/** Is this login phone already used by another account? */
+const phoneTaken = (phone, exceptId) => (phone ? Account.exists({ phone, ...(exceptId ? { _id: { $ne: exceptId } } : {}) }) : null);
+
+/**
+ * Login identifier: `login` (email or phone), or the older `email` field.
+ * Returns { kind: 'email'|'phone', value } (normalized) or fails the field.
+ */
+function loginField(c, body) {
+  const field = body?.login !== undefined ? 'login' : 'email';
+  const raw = body?.login !== undefined ? body.login : body?.email;
+  if (raw === undefined || raw === null || (typeof raw === 'string' && !raw.trim())) return c.fail(field, 'required');
+  if (typeof raw !== 'string' || raw.length > 254) return c.fail(field, 'invalid_type');
+  if (raw.includes('@')) {
+    const email = c.email({ v: raw }, 'v', { field });
+    return email ? { kind: 'email', value: email } : undefined;
+  }
+  const phone = normalizePhone(raw);
+  return phone ? { kind: 'phone', value: phone } : c.fail(field, 'invalid_format');
+}
+
+const findByLogin = (id) => Account.findOne(id.kind === 'email' ? { email: id.value } : { phone: id.value }).lean();
+
+/** Duplicate key on accounts: which identifier collided. */
+const dupCode = (err) => (err?.keyPattern?.phone || /phone/.test(err?.message || '') ? 'phone_taken' : 'email_taken');
 
 const deviceOf = (c, body) => ({
   deviceName: c.str(body, 'deviceName', { max: 80 }) || '',
@@ -75,7 +107,7 @@ async function purgeProperty(propertyId, session) {
   await SyncRecord.deleteMany({ propertyId }, { session });
   await Receipt.deleteMany({ _id: { $regex: `^${propertyId}\\|` } }, { session });
   await Invite.deleteMany({ propertyId }, { session });
-  await Account.updateMany({ propertyId }, { $set: { propertyId: null, role: null, joinedAt: null, updatedAt: new Date() } }, { session });
+  await Account.updateMany({ propertyId }, { $set: { propertyId: null, role: null, phone: null, joinedAt: null, updatedAt: new Date() } }, { session });
   await Property.deleteOne({ _id: propertyId }, { session });
 }
 
@@ -121,6 +153,9 @@ async function register(body, { lang, idempotencyKey: headerKey }) {
   }
 
   if (await Account.exists({ email })) throw conflict('email_taken');
+  // The owner signs in with the property phone too: it must not belong to another property.
+  const phone = input ? loginPhoneOf(input.phone) : null;
+  if (await phoneTaken(phone)) throw new AppError(409, 'phone_taken', { fields: [{ field: 'property.phone', code: 'phone_taken' }] });
   const passwordHash = await password.hash(plain);
 
   let account;
@@ -128,7 +163,7 @@ async function register(body, { lang, idempotencyKey: headerKey }) {
     account = await withTx(async (session) => {
       const now = new Date();
       const doc = {
-        _id: uuid(), email, passwordHash, displayName, preferredLanguage,
+        _id: uuid(), email, phone, passwordHash, displayName, preferredLanguage,
         propertyId: null, role: null, joinedAt: null, termsAcceptedAt: now, passwordChangedAt: now, createdAt: now, updatedAt: now,
       };
       if (inviteCode) {
@@ -150,7 +185,7 @@ async function register(body, { lang, idempotencyKey: headerKey }) {
       return doc;
     });
   } catch (err) {
-    if (err.code === 11000) throw conflict('email_taken');
+    if (err.code === 11000) throw conflict(dupCode(err));
     throw err;
   }
   return finishRegister(account, device, { replay: false });
@@ -173,22 +208,31 @@ async function finishRegister(account, device, { replay }) {
   return { status: replay ? 200 : 201, body: { ...prof, tokens: t, ...data } };
 }
 
-/** POST /v1/auth/login */
+/**
+ * Checks login identifier + password with the failed-attempt lock. The lock is per account (whether the person
+ * typed the email or the phone), or per identifier when no account matches.
+ */
+async function checkCredentials(id, plain) {
+  const account = await findByLogin(id);
+  const lockKey = account ? account._id : `${id.kind}:${id.value}`;
+  await attempts.assertNotLocked('login', lockKey);
+  if (!(await password.verify(plain, account?.passwordHash))) {
+    await attempts.recordFailure('login', lockKey);
+    throw unauthorized('invalid_credentials');
+  }
+  await attempts.clearFailures('login', lockKey);
+  return account;
+}
+
+/** POST /v1/auth/login — { login: email or phone, password } (`email` still accepted). */
 async function login(body) {
   const c = new Checker();
-  const email = c.email(body, 'email', { required: true });
+  const id = loginField(c, body);
   const plain = c.secret(body, 'password');
   const device = deviceOf(c, body);
   c.done();
 
-  await attempts.assertNotLocked('login', email);
-  const account = await Account.findOne({ email }).lean();
-  const ok = await password.verify(plain, account?.passwordHash);
-  if (!ok) {
-    await attempts.recordFailure('login', email);
-    throw unauthorized('invalid_credentials');
-  }
-  await attempts.clearFailures('login', email);
+  const account = await checkCredentials(id, plain);
   const t = await tokens.openSession(account, device);
   return { ...(await profile(account)), tokens: t };
 }
@@ -216,7 +260,7 @@ async function logout(body, auth) {
 /** POST /v1/auth/forgot — always 202 (does not reveal whether the email exists). */
 async function forgot(body, { lang }) {
   const c = new Checker();
-  const email = c.email(body, 'email', { required: true });
+  const email = c.email(body, 'email', { required: true }); // email only (the code is sent there)
   c.done();
   const out = { status: 'accepted' };
 
@@ -252,7 +296,7 @@ async function reset(body, { lang } = {}) {
   await tokens.revoke({ accountId: r.accountId }, 'password_reset');
   // Whoever just proved access to the mailbox must be able to sign in now, not after the lockout window.
   if (account) {
-    await Promise.all([attempts.clearFailures('login', account.email), attempts.clearFailures('confirm', account._id)]);
+    await Promise.all([attempts.clearFailures('login', account._id), attempts.clearFailures('confirm', account._id)]);
     await mailer.sendPasswordChanged(account, { via: 'reset', lang });
   }
 }
@@ -312,6 +356,12 @@ async function updateMe(auth, body) {
     if (await Account.exists({ email, _id: { $ne: auth.accountId } })) throw conflict('email_taken');
     set.email = email;
   }
+  if (prop.phone !== undefined) {
+    // property phone = the owner's login phone
+    const phone = loginPhoneOf(prop.phone);
+    if (await phoneTaken(phone, auth.accountId)) throw new AppError(409, 'phone_taken', { fields: [{ field: 'phone', code: 'phone_taken' }] });
+    set.phone = phone;
+  }
 
   try {
     await withTx(async (session) => {
@@ -326,7 +376,7 @@ async function updateMe(auth, body) {
       }
     });
   } catch (err) {
-    if (err.code === 11000) throw conflict('email_taken');
+    if (err.code === 11000) throw conflict(dupCode(err));
     throw err;
   }
   return profile(await loadAccount(auth.accountId));
@@ -346,16 +396,10 @@ async function deleteAccount(account, plain) {
 /** Web deletion request (Google Play): email + password, no app needed. */
 async function deleteByCredentials(body) {
   const c = new Checker();
-  const email = c.email(body, 'email', { required: true });
+  const id = loginField(c, body);
   const plain = c.secret(body, 'password');
   c.done();
-  await attempts.assertNotLocked('login', email);
-  const account = await Account.findOne({ email }).lean();
-  if (!(await password.verify(plain, account?.passwordHash))) {
-    await attempts.recordFailure('login', email);
-    throw unauthorized('invalid_credentials');
-  }
-  await attempts.clearFailures('login', email);
+  const account = await checkCredentials(id, plain);
   await deleteAccount(account, plain);
 }
 
@@ -367,9 +411,11 @@ async function createOwnProperty(auth, body) {
   const input = parseProperty(c, body?.property ?? body, 'property', { seed: body?.property ? body.seed : undefined });
   c.done();
   const account = auth.account;
+  const phone = loginPhoneOf(input.phone);
+  if (await phoneTaken(phone, account._id)) throw new AppError(409, 'phone_taken', { fields: [{ field: 'property.phone', code: 'phone_taken' }] });
   await withTx(async (session) => {
     const { property } = await createProperty(account, input, session);
-    await Account.updateOne({ _id: account._id, propertyId: null }, { $set: { propertyId: property._id, role: 'owner', joinedAt: new Date(), updatedAt: new Date() } }, { session });
+    await Account.updateOne({ _id: account._id, propertyId: null }, { $set: { propertyId: property._id, role: 'owner', phone, joinedAt: new Date(), updatedAt: new Date() } }, { session });
   });
   const fresh = await loadAccount(account._id);
   return { ...(await profile(fresh)), tokens: await tokens.reissue(fresh, auth.sessionId), ...(await firstPage(fresh)) };
@@ -456,7 +502,7 @@ async function acceptInvite(auth, body) {
     const now = new Date();
     const used = await Invite.updateOne({ _id: inv._id, usedAt: null }, { $set: { usedAt: now, usedBy: account._id } }, { session });
     if (!used.modifiedCount) throw invalid([{ field: 'code', code: 'invite_invalid' }]);
-    await Account.updateOne({ _id: account._id }, { $set: { propertyId: inv.propertyId, role: inv.role, joinedAt: now, updatedAt: now } }, { session });
+    await Account.updateOne({ _id: account._id }, { $set: { propertyId: inv.propertyId, role: inv.role, phone: null, joinedAt: now, updatedAt: now } }, { session });
   });
   await attempts.clearFailures('invite', auth.accountId);
   const fresh = await loadAccount(account._id);
