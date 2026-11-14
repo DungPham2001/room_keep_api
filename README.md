@@ -10,7 +10,7 @@ npm install
 npm run db:init          # tạo database, collection, index (chạy lại an toàn)
 npm run dev              # http://localhost:4000  -> /health, /v1
 npm test                 # replica set in-memory (dùng mongod local nếu có)
-npm run docs             # sinh lại mục 6 (CRUD) của docs/API-cho-FE.md sau khi sửa schema
+npm run docs             # sinh lại mục 7 (CRUD) của docs/API-cho-FE.md sau khi sửa schema
 ```
 
 ## Kết nối MongoDB
@@ -43,6 +43,7 @@ npm run docs             # sinh lại mục 6 (CRUD) của docs/API-cho-FE.md sa
 | `src/services/onboarding.js` | Bước 2-5 của đăng ký → bản ghi AppSettings, đơn giá điện/nước/dịch vụ, dãy/tầng/phòng |
 | `src/services/tables.js` | Danh sách bảng đồng bộ, bảng chỉ ghi thêm, bảng chỉ chủ trọ thấy, bảng gắn kỳ thu |
 | `src/web/deletion.js` | Trang web `/account/delete` để yêu cầu xóa tài khoản (yêu cầu của Google Play) |
+| `src/web/privacy.js` | Trang `/privacy` chính sách quyền riêng tư (vi/en), đứng tên `PRIVACY_OWNER`, liên hệ `PRIVACY_EMAIL`. Sửa cách lưu dữ liệu thì cập nhật trang này |
 | `src/middleware/` | requestId + ngôn ngữ, xác thực, rate limit, chặn app cũ (`X-App-Version`), lỗi `{code,message,...}` |
 
 ## Quyết định khi tài liệu chưa nói rõ

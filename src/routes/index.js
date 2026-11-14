@@ -54,7 +54,7 @@ r.delete('/me', authenticate, h(async (req, res) => {
   await accounts.deleteAccount(req.auth.account, req.body?.password);
   res.status(204).end();
 }));
-r.post('/me/property', authenticate, h(async (req, res) => res.status(201).json(await accounts.createOwnProperty(req.auth, req.body?.property ?? req.body))));
+r.post('/me/property', authenticate, h(async (req, res) => res.status(201).json(await accounts.createOwnProperty(req.auth, req.body))));
 
 // ---------- sync (145-152) ----------
 r.post('/sync/push', authenticate, requireProperty, h(async (req, res) => res.json(await sync.push(req.auth, req.body))));

@@ -105,7 +105,7 @@ async function register(body, { lang, idempotencyKey: headerKey }) {
   const accepted = body?.acceptTerms === true || acc.acceptTerms === true;
   if (!accepted) c.fail('acceptTerms', 'terms_required');
   const inviteCode = c.str(body, 'inviteCode', { max: 20 });
-  const input = inviteCode ? undefined : parseProperty(c, body?.property, 'property');
+  const input = inviteCode ? undefined : parseProperty(c, body?.property, 'property', { seed: body?.seed });
   const device = deviceOf(c, body);
   const idemKey = c.str(body, 'idempotencyKey', { max: 100 }) || (typeof headerKey === 'string' ? headerKey.slice(0, 100) : null);
   c.done();
@@ -363,7 +363,8 @@ async function deleteByCredentials(body) {
 async function createOwnProperty(auth, body) {
   if (auth.propertyId) throw conflict('has_property');
   const c = new Checker();
-  const input = parseProperty(c, body, 'property');
+  // body = { property: {...}, seed? } or the property object itself
+  const input = parseProperty(c, body?.property ?? body, 'property', { seed: body?.property ? body.seed : undefined });
   c.done();
   const account = auth.account;
   await withTx(async (session) => {

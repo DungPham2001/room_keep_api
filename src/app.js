@@ -10,6 +10,7 @@ const { appVersion } = require('./middleware/appVersion');
 const { notFound, errorHandler } = require('./middleware/errors');
 const api = require('./routes');
 const deletion = require('./web/deletion');
+const privacy = require('./web/privacy');
 
 const app = express();
 
@@ -25,6 +26,7 @@ app.use(context);
 
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));
 app.use(deletion); // public web page for deletion requests (rate limited inside)
+app.use(privacy); // public privacy policy page
 
 // Vercel caps request bodies at 4.5 MB; keep push batches under ~4 MB.
 app.use('/v1', express.json({ limit: '4mb' }), limiter, appVersion, (_req, res, next) => {

@@ -99,6 +99,29 @@ test('register: validation, one transaction, seed records, tokens', async () => 
   await api.post('auth/login', { email: 'b@example.com', password: PASSWORD }).expect(401);
 });
 
+test('register with seed:false creates no records; the app pushes its own AppSettings without conflict', async () => {
+  const base = { account: { email: 'noseed@example.com', password: PASSWORD, displayName: 'N' }, acceptTerms: true };
+  const bad = (await api.post('auth/register', { ...base, seed: false, property: { name: 'P', layout: { generate: { blocks: 1, floorsPerBlock: 1, roomsPerFloor: 1 } } } }).expect(400)).body;
+  assert.deepEqual(bad.fields, [{ field: 'property.layout', code: 'not_allowed' }]);
+  assert.equal((await api.post('auth/register', { ...base, seed: 'no', property: { name: 'P' } }).expect(400)).body.fields[0].field, 'seed');
+
+  const r = (await api.post('auth/register', { ...base, seed: false, property: { name: 'Trọ Không Seed' } }).expect(201)).body;
+  assert.deepEqual(r.changes, []);
+  assert.equal(r.rev, 0);
+  assert.equal(r.property.name, 'Trọ Không Seed');
+  const t = r.tokens.accessToken;
+  const push = (await api.post('sync/push', { changes: [
+    { table: 'AppSettings', id: 'main', op: 'upsert', baseRev: null, payload: { propertyName: 'Trọ Không Seed', dueDay: 5 } },
+    { table: 'OnboardingStep', id: 'app-step-1', op: 'upsert', baseRev: null, payload: { key: 'rooms', isDone: false } },
+  ] }, t).expect(200)).body;
+  assert.equal(push.accepted.length, 2);
+  assert.equal(push.conflicts.length, 0);
+
+  // also accepted inside `property`, and for POST /me/property
+  const r2 = (await api.post('auth/register', { ...base, account: { ...base.account, email: 'noseed2@example.com' }, property: { name: 'P2', seed: false } }).expect(201)).body;
+  assert.deepEqual(r2.changes, []);
+});
+
 test('register is idempotent by idempotencyKey (retry after a lost response)', async () => {
   const body = { account: { email: 'idem@example.com', password: PASSWORD, displayName: 'I' }, acceptTerms: true, property: { name: 'P' }, idempotencyKey: 'reg-1' };
   const first = (await api.post('auth/register', body).expect(201)).body;
@@ -278,6 +301,18 @@ test('devices: list, current flag, remote sign-out', async () => {
   const c1 = (await api.post('auth/login', { email: 'chu@example.com', password: PASSWORD, deviceId: 'install-x' }).expect(200)).body;
   await api.post('auth/login', { email: 'chu@example.com', password: PASSWORD, deviceId: 'install-x' }).expect(200);
   await api.get('me', c1.tokens.accessToken).expect(401);
+});
+
+test('privacy policy page (vi default, en), with owner, contact and deletion link', async () => {
+  const vi = await request(app).get('/privacy').expect(200);
+  assert.match(vi.headers['content-type'], /html/);
+  assert.match(vi.text, /Chính sách quyền riêng tư RoomKeep/);
+  assert.match(vi.text, /Pham Dung/);
+  assert.match(vi.text, /mailto:2631phamvandung@gmail.com/);
+  assert.match(vi.text, /\/account\/delete/);
+  const en = await request(app).get('/privacy?lang=en').expect(200);
+  assert.match(en.text, /RoomKeep Privacy Policy/);
+  assert.match((await request(app).get('/privacy').set('Accept-Language', 'en-US')).text, /RoomKeep Privacy Policy/);
 });
 
 test('delete account: password required, owner deletes property data; web deletion page', async () => {

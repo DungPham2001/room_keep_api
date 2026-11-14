@@ -1,36 +1,85 @@
 # RoomKeep API — tài liệu cho app Android
 
-Base URL: `https://<domain>` — mọi endpoint nằm dưới `/v1`. Kiểm tra sống: `GET /v1/health`.
-Chỉ HTTPS, JSON UTF-8. Ngày `yyyy-MM-dd`, kỳ `yyyy-MM`, thời điểm ISO 8601 UTC. Tiền là **số nguyên đồng**.
+| | |
+|---|---|
+| **Base URL** | `https://roomkeepapi-ivory.vercel.app` (mọi endpoint nằm dưới `/v1`) |
+| **Kiểm tra sống** | `GET https://roomkeepapi-ivory.vercel.app/v1/health` |
+| **Trang xóa tài khoản** (khai trên Google Play) | `https://roomkeepapi-ivory.vercel.app/account/delete` (`?lang=en` cho tiếng Anh) |
+| **Chính sách quyền riêng tư** (khai trên Google Play và mở từ màn hình đăng ký) | `https://roomkeepapi-ivory.vercel.app/privacy` (`?lang=en` cho tiếng Anh) |
+| **Định dạng** | Chỉ HTTPS, JSON UTF-8. Ngày `yyyy-MM-dd`, kỳ `yyyy-MM`, thời điểm ISO 8601 UTC. Tiền là **số nguyên đồng** |
+| **Đăng nhập** | `Authorization: Bearer <accessToken>` ở mọi endpoint có 🔒 |
+
+**Mục lục:** [0. Tóm tắt endpoint](#0-tóm-tắt-endpoint) · [1. Quy ước chung](#1-quy-ước-chung) · [2. Tài khoản và phiên](#2-tài-khoản-và-phiên) · [3. Mời quản lý](#3--mời-quản-lý-và-thành-viên-chủ-trọ) · [4. Đồng bộ](#4--đồng-bộ) · [5. Luồng xử lý trong app](#5-luồng-xử-lý-trong-app) · [6. Giới hạn](#6-giới-hạn) · [7. CRUD từng phần](#7--crud-từng-phần)
+
+## 0. Tóm tắt endpoint
+
+| Nhóm | Method | Đường dẫn | 🔒 | Mục |
+|---|---|---|---|---|
+| Hệ thống | GET | `/v1/health` | | [2.1](#21-get-v1health) |
+| Tài khoản | POST | `/v1/auth/register` | | [2.2](#22-post-v1authregister--201) |
+| | POST | `/v1/auth/login` | | [2.3](#23-post-v1authlogin--200) |
+| | POST | `/v1/auth/refresh` | | [2.4](#24-post-v1authrefresh--200) |
+| | POST | `/v1/auth/logout` | | [2.5](#25-post-v1authlogout--204) |
+| | POST | `/v1/auth/forgot` | | [2.6](#26-quên--đặt-lại-mật-khẩu) |
+| | POST | `/v1/auth/reset` | | [2.6](#26-quên--đặt-lại-mật-khẩu) |
+| | POST | `/v1/auth/change-password` | 🔒 | [2.7](#27--post-v1authchange-password--200) |
+| Hồ sơ | GET / PATCH / DELETE | `/v1/me` | 🔒 | [2.8](#28--hồ-sơ) |
+| | POST | `/v1/me/property` | 🔒 | [2.8](#28--hồ-sơ) |
+| Thiết bị | GET | `/v1/devices` | 🔒 | [2.9](#29--thiết-bị) |
+| | DELETE | `/v1/devices/{id}` | 🔒 | [2.9](#29--thiết-bị) |
+| Mời quản lý | POST / GET | `/v1/invites` | 🔒 chủ trọ | [3](#3--mời-quản-lý-và-thành-viên-chủ-trọ) |
+| | DELETE | `/v1/invites/{id}` | 🔒 chủ trọ | [3](#3--mời-quản-lý-và-thành-viên-chủ-trọ) |
+| | POST | `/v1/invites/accept` | 🔒 | [3](#3--mời-quản-lý-và-thành-viên-chủ-trọ) |
+| Thành viên | GET | `/v1/members` | 🔒 chủ trọ | [3](#3--mời-quản-lý-và-thành-viên-chủ-trọ) |
+| | DELETE | `/v1/members/{accountId}` | 🔒 | [3](#3--mời-quản-lý-và-thành-viên-chủ-trọ) |
+| Đồng bộ | POST | `/v1/sync/push` | 🔒 | [4.2](#42-post-v1syncpush) |
+| | GET | `/v1/sync/pull` | 🔒 | [4.3](#43-get-v1syncpullsincerevlimit500tablesroomtenant) |
+| | GET | `/v1/sync/summary` | 🔒 | [4.5](#45-get-v1syncsummary) |
+| Cài đặt nhà trọ | GET / PATCH | `/v1/settings` | 🔒 | [7](#7--crud-từng-phần) |
+| CRUD 69 phần | GET / POST | `/v1/{phần}` (vd `/v1/rooms`, `/v1/tenants`, `/v1/contracts`) | 🔒 | [7](#7--crud-từng-phần) |
+| | GET / PATCH / DELETE | `/v1/{phần}/{id}` | 🔒 | [7](#7--crud-từng-phần) |
+| Web | GET / POST | `/account/delete` (không có `/v1`) | | [2.8](#28--hồ-sơ) |
+| | GET | `/privacy` (không có `/v1`) | | chính sách quyền riêng tư |
 
 ## 1. Quy ước chung
 
 ### 1.1 Header
 | Header | Khi nào | Ghi chú |
 |---|---|---|
-| `Authorization: Bearer <accessToken>` | Mọi endpoint cần đăng nhập (đánh dấu 🔒) | Không bao giờ đưa token vào URL |
-| `Accept-Language: vi` hoặc `en` | Nên gửi luôn | Ngôn ngữ của `message` lỗi và email quên mật khẩu |
-| `X-App-Version: 1.2.0` | Nên gửi luôn | Cũ hơn `minAppVersion` → `426 upgrade_required` |
+| `Authorization: Bearer <accessToken>` | Mọi endpoint có 🔒 | Không bao giờ đưa token vào URL, log hay tệp xuất |
+| `Accept-Language: vi` hoặc `en` | Nên gửi ở mọi request | Ngôn ngữ của `message` lỗi và của email (mã đặt lại, báo đổi mật khẩu) |
+| `X-App-Version: 1.2.0` | Nên gửi ở mọi request | Cũ hơn `minAppVersion` → `426 upgrade_required` |
+| `Content-Type: application/json` | Request có body | |
 | `Idempotency-Key` | Tùy chọn ở `/auth/register` | Tương đương `idempotencyKey` trong body |
+
+Phản hồi có `X-Request-Id` (cũng là `requestId` trong body lỗi): ghi vào nhật ký lỗi của app để tra cứu khi cần hỗ trợ.
 
 ### 1.2 Lỗi
 ```json
 { "code": "validation_failed", "message": "Dữ liệu không hợp lệ", "fields": [{ "field": "account.email", "code": "invalid_format" }], "requestId": "req_ab12cd34ef56" }
 ```
-App **dịch theo `code`**, không hiển thị `message` thô. Mã trường (`fields[].code`): `required`, `invalid_type`, `too_short`, `too_long`, `out_of_range`, `invalid_format`, `invalid_enum`, `weak_password`, `terms_required`, `not_found`, `duplicate_id`, `invite_invalid`, `wrong_password`, `same_as_old`.
+App **dịch theo `code`**, không hiển thị `message` thô (`message` chỉ là chữ dự phòng theo `Accept-Language`).
+
+Mã lỗi từng trường (`fields[].code`): `required`, `invalid_type`, `too_short`, `too_long`, `out_of_range`, `invalid_format`, `invalid_enum`, `weak_password`, `terms_required`, `not_found` (liên kết không tồn tại), `duplicate`, `duplicate_id`, `invite_invalid`, `wrong_password`, `same_as_old`.
 
 | HTTP | `code` | App nên làm |
 |---|---|---|
 | 400 | `validation_failed` | Tô đỏ các trường trong `fields` |
 | 400 | `reset_invalid` | "Mã đặt lại không đúng hoặc đã hết hạn" |
-| 401 | `unauthorized`, `token_expired`, `token_invalid` | Gọi `/auth/refresh` **một lần** rồi gửi lại |
+| 401 | `unauthorized`, `token_expired`, `token_invalid` | Gọi `/auth/refresh` **một lần** rồi gửi lại request |
 | 401 | `session_revoked`, `session_expired`, `refresh_invalid`, `refresh_reused` | Về màn hình đăng nhập, **không xóa dữ liệu trên máy** |
 | 401 | `invalid_credentials` | "Email hoặc mật khẩu không đúng" |
 | 403 | `wrong_password` | Mật khẩu xác nhận sai (đổi mật khẩu, xóa tài khoản, đổi email) |
-| 403 | `forbidden` | Vai trò không đủ quyền |
+| 403 | `forbidden` | Vai trò không đủ quyền (quản lý vào phần của chủ trọ) |
 | 403 | `no_property` | Tài khoản chưa thuộc nhà trọ nào → màn hình "nhập mã mời / tạo nhà trọ" |
-| 404 | `not_found` | |
+| 404 | `not_found` | Bản ghi không còn (bị xóa ở máy khác): tải lại danh sách |
 | 409 | `email_taken`, `already_member`, `already_in_property`, `has_property`, `owner_cannot_leave` | Thông báo tương ứng |
+| 409 | `version_conflict` | Bản ghi đã bị sửa ở nơi khác; body có `current` (bản mới nhất) để hiện so sánh |
+| 409 | `duplicate` | Đã tồn tại (vd kỳ thu tháng này); body có `existingId` |
+| 409 | `has_dependents` | Không xóa được vì còn dữ liệu liên kết; `blockedBy` liệt kê phần đang vướng |
+| 409 | `contract_overlap` | Phòng đã có hợp đồng khác trong khoảng ngày; `conflictWith` là id hợp đồng đó |
+| 409 | `append_only` | Lần thu / sổ cọc không sửa được, chỉ xóa rồi ghi lại |
+| 409 | `period_locked` | Kỳ thu đã khóa |
 | 409 | `resync_required` | Tải lại toàn bộ (mục 4.4) |
 | 413 | `payload_too_large` | Chia lô nhỏ hơn |
 | 426 | `upgrade_required` | Màn hình bắt buộc cập nhật (`minAppVersion`, `latestAppVersion` có trong body) |
@@ -38,7 +87,7 @@ App **dịch theo `code`**, không hiển thị `message` thô. Mã trường (`
 | 503 | `service_unavailable` | "Máy chủ đang bận" + nút thử lại |
 | 5xx | `internal_error` | "Hệ thống đang gặp sự cố" + nút thử lại |
 
-Không có phản hồi (mất mạng, timeout, DNS, SSL) là lỗi phía app: hiện "Không có kết nối mạng, vui lòng kiểm tra và thử lại".
+Không nhận được phản hồi (mất mạng, timeout, DNS, SSL) là lỗi phía app: hiện "Không có kết nối mạng, vui lòng kiểm tra và thử lại" kèm nút thử lại.
 
 ## 2. Tài khoản và phiên
 
@@ -73,6 +122,7 @@ Tạo **tài khoản + nhà trọ trong một giao dịch**. `billing`, `rates`,
 * `layout` dạng tự liệt kê (đúng như bản xem trước đã sửa trong app):
   `{ "blocks": [{ "id?": "...", "name": "Dãy A" }], "floors": [{ "id?", "blockId" | "blockIndex": 0, "label": "Tầng 1" }], "rooms": [{ "id?", "floorId" | "floorIndex": 0, "name": "A101", "monthlyRent": 2500000, "areaSqm?": 18.5, "capacity?": 2 }] }`.
   Gửi `id` (UUID của app) để giữ đúng id đã có trong Room. `generate` đặt tên `Dãy A`, `Tầng 1`, phòng `A101, A102...`. Tối đa 1000 phòng.
+* **`"seed": false`** (đặt ở gốc body hoặc trong `property`): server **không tạo bản ghi nào**, kể cả `AppSettings` và `OnboardingStep`; phản hồi có `changes: []`, `rev: 0`. App tự push dữ liệu đã tạo ở máy sau khi đăng ký (`baseRev: null`, không xung đột). Khi `seed: false` thì không gửi kèm `billing`/`rates`/`layout` (gửi → `400`, `fields[].code = "not_allowed"`). Mặc định `seed: true`.
 * **Người được mời làm quản lý**: thay `property` bằng `"inviteCode": "ABCD2345"`.
 * Gửi lại cùng `idempotencyKey` + cùng email/mật khẩu (mất mạng sau khi server đã tạo) → `200` với cùng tài khoản, không tạo nhà trọ thứ hai.
 
@@ -92,7 +142,7 @@ Phản hồi (dùng chung cho đăng ký, đăng nhập, nhận mời, tạo nh�
 }
 ```
 `changes` + `rev` chỉ có ở đăng ký và tạo nhà trọ: ghi thẳng vào Room, đặt `lastPulledRev = rev` (nếu `hasMore` thì pull tiếp từ `rev`).
-Bản ghi sinh sẵn: `AppSettings` (id `"main"`), `ElectricityTier`, `WaterRate`, `Service` + `ServicePrice`, `Block`, `Floor`, `Room` (`status: "vacant"`, có `nameNoAccent`) + `RoomPrice`, `OnboardingStep` (`property_info`, `billing_rules`, `rates`, `blocks_rooms`, `first_tenant`, đánh dấu `isDone` theo những gì đã nhập).
+Bản ghi sinh sẵn (khi không có `seed: false`): `AppSettings` (id `"main"`), `ElectricityTier`, `WaterRate`, `Service` + `ServicePrice`, `Block`, `Floor`, `Room` (`status: "vacant"`, có `nameNoAccent`) + `RoomPrice`, `OnboardingStep` (`property_info`, `billing_rules`, `rates`, `blocks_rooms`, `first_tenant`, đánh dấu `isDone` theo những gì đã nhập).
 
 ### 2.3 `POST /v1/auth/login` → `200`
 `{ "email", "password", "deviceName", "deviceId" }` → `{ account, property, role, tokens }`. Sai 5 lần/15 phút → `429`.
@@ -128,8 +178,8 @@ Luồng màn hình đề xuất: *Quên mật khẩu* (nhập email) → *Nhập
 * `GET /v1/me` → `{ account, property, role }` (`property` = `null` nếu chưa thuộc nhà trọ nào).
 * `PATCH /v1/me` gửi trường muốn đổi: `displayName`, `preferredLanguage` (`vi`|`en`), `email` (**kèm `password`**), `propertyName`, `address`, `phone` (3 trường nhà trọ chỉ chủ trọ). Trả `{ account, property, role }`. Đổi thông tin nhà trọ cũng cập nhật bản ghi `AppSettings` (các máy khác nhận khi pull).
 * `DELETE /v1/me` `{ "password" }` → `204`. **Chủ trọ: xóa nhà trọ và toàn bộ dữ liệu trên máy chủ**, quản lý mất quyền truy cập. Quản lý: chỉ xóa tài khoản của mình.
-* `POST /v1/me/property` `{ "property": {...như đăng ký} }` → `201` (cùng định dạng 2.2): cho tài khoản chưa có nhà trọ (vd quản lý bị gỡ).
-* Trang web yêu cầu xóa (đưa link lên Google Play): `https://<domain>/account/delete` (thêm `?lang=en`).
+* `POST /v1/me/property` `{ "property": {...như đăng ký}, "seed"?: false }` → `201` (cùng định dạng 2.2): cho tài khoản chưa có nhà trọ (vd quản lý bị gỡ).
+* Trang web yêu cầu xóa (đưa link lên Google Play): `https://roomkeepapi-ivory.vercel.app/account/delete` (thêm `?lang=en`).
 
 ### 2.9 🔒 Thiết bị
 * `GET /v1/devices` → `{ "devices": [{ "id", "name", "createdAt", "lastSeenAt", "expiresAt", "isCurrent" }] }`
@@ -181,7 +231,7 @@ Phản hồi `200`:
 ```
 * `accepted`: ghi `serverRev = rev`, xóa khỏi outbox. Có thể kèm `duplicate: true` (gửi lại cùng `idempotencyKey`, không tạo phiên bản mới) hoặc `unchanged: true` (server đã có đúng nội dung này).
 * `conflicts`: lưu vào `SyncConflict`, hiện màn hình so sánh. **Giữ bản máy** → gửi lại với `baseRev = server.rev`. **Giữ bản server** → ghi `server.payload` vào Room, bỏ outbox.
-* `rejected` (không thử lại, ghi vào nhật ký đồng bộ): `unknown_table`, `invalid_change`, `validation_failed` (kèm `fields`, theo schema ở mục 6.4), `payload_too_large`, `forbidden_table` (quản lý), `period_locked` (kỳ đã khóa).
+* `rejected` (không thử lại, ghi vào nhật ký đồng bộ): `unknown_table`, `invalid_change`, `validation_failed` (kèm `fields`, theo schema ở mục 7.4), `payload_too_large`, `forbidden_table` (quản lý), `period_locked` (kỳ đã khóa).
 * Nhiều thay đổi của cùng một bản ghi trong một lô: thay đổi sau dựa trên thay đổi trước, không tự xung đột.
 * **Không bao giờ xung đột:** `Collection`, `DepositEntry`, `MeterReading` (chỉ ghi thêm).
 * **Khóa kỳ:** `BillingCycle.payload = { cycle: "2026-11", status: "open" | "locked", ... }`. Khi `locked`: sửa `RoomStatement` (theo `cycleId`), `StatementLine`/`StatementAdjust` (theo `statementId`), `SharedCost`/`UsageLog` (theo `cycle`), `SharedCostShare` (theo `sharedCostId`) bị `period_locked`. Ghi `Collection` vẫn được. Chỉ chủ trọ mở khóa được.
@@ -207,20 +257,62 @@ Phản hồi `200`:
 ### 4.5 `GET /v1/sync/summary`
 `{ "serverRev": 120, "purgedRev": 0, "lastChangeAt": "...", "tables": { "Room": 15, "Tenant": 22 } }` cho màn hình trạng thái kết nối.
 
-## 5. Giới hạn
+## 5. Luồng xử lý trong app
+
+Nguyên tắc chung: **giao diện chỉ đọc từ Room trên máy**; API chỉ dùng để đăng nhập và đồng bộ. Mất mạng hay máy chủ lỗi thì màn hình vẫn chạy trên dữ liệu đã có, hiện dải "Đang ngoại tuyến", thay đổi xếp hàng trong `SyncOutbox`.
+
+### 5.1 Mở app
+1. `GET /v1/health` (không bắt buộc chờ): nếu `minAppVersion` > phiên bản app → màn hình bắt buộc cập nhật.
+2. Còn token trong bộ nhớ (app chưa bị đóng) → vào thẳng. Không còn → màn hình chọn **Đăng nhập** / **Đăng ký** / **Dùng không tài khoản**. Ô email điền sẵn email lần trước (chỉ nhớ email, không nhớ mật khẩu).
+3. Đã đăng nhập → mở tệp Room của tài khoản (`roomkeep_<accountId>.db`), đẩy outbox (`sync/push`) rồi kéo thay đổi (`sync/pull?since=<lastPulledRev>`).
+
+### 5.2 Giữ phiên đăng nhập
+| Tình huống | App làm gì |
+|---|---|
+| Access token còn ~5 phút và app đang mở, có thao tác gần đây | `POST /auth/refresh`, thay cả cặp token |
+| Request nhận `401 token_expired` / `unauthorized` | Refresh **một lần** (nhiều request cùng lúc dùng chung một lần refresh) rồi gửi lại |
+| Chuyển sang app khác (Zalo...) rồi quay lại | Giữ nguyên phiên và màn hình; token hết hạn thì refresh ngay, người dùng không thấy gì |
+| Ở nền hoặc không thao tác **quá 1 giờ**, app bị đóng hẳn | Xóa token khỏi bộ nhớ, lần mở sau đăng nhập lại |
+| Refresh trả `session_expired` / `refresh_reused` / `refresh_invalid` / `session_revoked` | Về màn hình đăng nhập, **giữ dữ liệu và outbox trên máy** |
+| Đăng xuất | `POST /auth/logout { refreshToken }`, hỏi giữ hay xóa dữ liệu trên máy |
+
+Token **chỉ nằm trong bộ nhớ**, không lưu vào Room, SharedPreferences hay tệp xuất. Phiên tối đa 12 giờ kể từ đăng nhập (`sessionExpiresAt`); báo trước khi sắp hết.
+
+### 5.3 Đăng ký
+1. Các bước 1-5 lưu nháp trong `RegistrationDraft` (không lưu mật khẩu). Sinh `idempotencyKey` một lần cho bản nháp.
+2. Bước 5 (dãy, tầng, phòng): app tự sinh danh sách để người dùng xem và sửa, rồi gửi dạng `layout.blocks/floors/rooms` có `id` của app.
+3. `POST /auth/register`. Mất mạng giữa chừng → giữ nháp, bấm lại dùng **cùng `idempotencyKey`** (server trả `200` với đúng tài khoản cũ, không tạo nhà trọ thứ hai).
+4. Thành công → ghi `changes` vào Room, `lastPulledRev = rev`. App tự tạo dữ liệu ở máy (không gửi `layout`/`rates`/`billing`) thì gửi `"seed": false`, rồi push toàn bộ bản ghi đã tạo, kể cả `AppSettings` id `main`.
+5. Người được mời làm quản lý: chỉ bước 1 + ô **mã mời**, gửi `inviteCode` thay cho `property`.
+
+### 5.4 Quên mật khẩu
+*Nhập email* → `POST /auth/forgot` (luôn `202`, hiện "Nếu email đã đăng ký, mã đã được gửi") → *Nhập mã + mật khẩu mới* → `POST /auth/reset` (`204`) → *Đăng nhập* với email điền sẵn. Nút "Gửi lại mã" sau 60 giây. Kiểm tra mật khẩu ở app (8 ký tự, có chữ và số) chỉ để gợi ý; lỗi thật lấy từ `fields`.
+
+### 5.5 Đồng bộ
+1. Mọi thay đổi dữ liệu ghi vào `SyncOutbox` **trong cùng giao dịch Room** với thay đổi đó, kèm `baseRev` = `serverRev` hiện tại và một `idempotencyKey` mới.
+2. Khi có mạng và app đang mở (hoặc người dùng bấm "Đồng bộ"): `POST /sync/push` theo lô ≤ 500 thay đổi, rồi `GET /sync/pull` đến khi `hasMore = false`.
+3. Xử lý kết quả push: `accepted` → ghi `serverRev`, xóa khỏi outbox. `conflicts` → `SyncConflict` + màn hình so sánh. `rejected` → ghi `SyncLog`, không thử lại.
+4. Lỗi mạng, `5xx`, `429` → thử lại cả lô, giãn cách tăng dần (2s, 4s, 8s... tối đa vài phút).
+5. Ghi mọi lần đồng bộ vào `SyncLog` (thời điểm, hướng, số bản ghi, kết quả) cho màn hình nhật ký.
+
+### 5.6 Mời quản lý
+Chủ trọ: `POST /invites` → hiện mã 8 ký tự + nút sao chép/gửi Zalo. Người nhận: đăng ký với `inviteCode` (5.3), hoặc đã có tài khoản thì `POST /invites/accept` → **thay token đang giữ** bằng `tokens` trong phản hồi, mở tệp Room mới, pull từ `since=0`. Khi `role = "manager"`: ẩn lợi nhuận, lương, chi phí tổng, mời người, xóa nhà trọ.
+
+## 6. Giới hạn
 * Theo IP: đọc 120/phút, ghi 60/phút, các endpoint đăng nhập/đăng ký/quên mật khẩu 10/phút → `429` + `Retry-After`.
 * Timeout app đề xuất 15 giây; không thử lại vô hạn.
+* Một lần gọi đầu tiên sau một thời gian không ai dùng có thể chậm hơn vài giây (máy chủ khởi động); timeout 15 giây là đủ.
 
 <!-- CRUD:START: phần này sinh tự động từ src/resources/schema.js bằng `npm run docs`, đừng sửa tay -->
-## 6. 🔒 CRUD từng phần
+## 7. 🔒 CRUD từng phần
 
 Mỗi phần (69 bảng của Room) có REST CRUD riêng. Cài đặt nhà trọ là `GET/PATCH /v1/settings`.
 
 * Dữ liệu CRUD và dữ liệu đồng bộ là **một**: ghi qua CRUD tăng `rev`, app nhận khi pull; ghi qua push thì CRUD đọc thấy ngay.
 * App Android vẫn nên dùng `sync/push` + `sync/pull` cho thao tác hằng ngày (offline-first). CRUD dùng khi cần thao tác trực tiếp với server (web quản trị, màn hình chỉ chạy khi có mạng, công cụ nhập liệu, kiểm thử).
-* `sync/push` kiểm tra **cùng schema** ở mục 6.4: thiếu trường bắt buộc, sai kiểu, sai enum → bản ghi vào `rejected` với `code: "validation_failed"` và `fields`. Trường app có mà schema chưa có được giữ nguyên.
+* `sync/push` kiểm tra **cùng schema** ở mục 7.4: thiếu trường bắt buộc, sai kiểu, sai enum → bản ghi vào `rejected` với `code: "validation_failed"` và `fields`. Trường app có mà schema chưa có được giữ nguyên.
 
-### 6.1 Quy ước chung
+### 7.1 Quy ước chung
 
 Mọi endpoint cần `Authorization: Bearer <accessToken>` và tài khoản đã thuộc một nhà trọ. Dữ liệu chỉ là của nhà trọ trong token.
 
@@ -243,7 +335,7 @@ Mọi endpoint cần `Authorization: Bearer <accessToken>` và tài khoản đã
 
 **Lỗi riêng của CRUD:** `400 validation_failed` (`fields[].code`: `required`, `invalid_type`, `too_long`, `out_of_range`, `invalid_format`, `invalid_enum`, `not_found` = liên kết không tồn tại), `403 forbidden` (quản lý vào bảng chỉ chủ trọ), `404 not_found`, `409 duplicate` (kèm `existingId`), `409 version_conflict`, `409 has_dependents`, `409 contract_overlap`, `409 append_only`, `409 period_locked`.
 
-### 6.2 Luật nghiệp vụ
+### 7.2 Luật nghiệp vụ
 
 **Liên kết khi xóa:** *chặn xóa* = không xóa được bản ghi cha khi còn bản ghi này; *xóa theo* = xóa bản ghi cha thì bản ghi này bị xóa cùng.
 
@@ -254,7 +346,7 @@ Mọi endpoint cần `Authorization: Bearer <accessToken>` và tài khoản đã
 - `collections`, `deposit-entries` chỉ ghi thêm: không PATCH (`409 append_only`); nhập nhầm thì xóa rồi ghi lại.
 - `room-statements.paidAmount`, `collectStatus` (`unpaid`/`partial`/`paid`) tính từ các lần thu, không lưu.
 
-### 6.3 Danh sách các phần
+### 7.3 Danh sách các phần
 
 | Phần | Đường dẫn | Chỉ chủ trọ |
 |---|---|---|
@@ -328,7 +420,7 @@ Mọi endpoint cần `Authorization: Bearer <accessToken>` và tài khoản đã
 | Việc đầu/cuối tháng | [`/v1/checklist-items`](#checklist-items) |  |
 | Đánh dấu việc đầu/cuối tháng | [`/v1/checklist-runs`](#checklist-runs) |  |
 
-### 6.4 Trường của từng phần
+### 7.4 Trường của từng phần
 
 #### settings
 

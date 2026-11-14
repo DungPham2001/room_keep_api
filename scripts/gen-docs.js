@@ -1,5 +1,5 @@
 /**
- * Generates section 6 "CRUD từng phần" of docs/API-cho-FE.md from src/resources/schema.js, so the field
+ * Generates section 7 "CRUD từng phần" of docs/API-cho-FE.md from src/resources/schema.js, so the field
  * reference never drifts from the code. Only the text between the CRUD:START / CRUD:END markers is replaced.
  *   npm run docs
  */
@@ -28,15 +28,15 @@ const lines = [];
 const out = (s = '') => lines.push(s);
 
 out('<!-- CRUD:START: phần này sinh tự động từ src/resources/schema.js bằng `npm run docs`, đừng sửa tay -->');
-out('## 6. 🔒 CRUD từng phần');
+out('## 7. 🔒 CRUD từng phần');
 out();
 out('Mỗi phần (69 bảng của Room) có REST CRUD riêng. Cài đặt nhà trọ là `GET/PATCH /v1/settings`.');
 out();
 out('* Dữ liệu CRUD và dữ liệu đồng bộ là **một**: ghi qua CRUD tăng `rev`, app nhận khi pull; ghi qua push thì CRUD đọc thấy ngay.');
 out('* App Android vẫn nên dùng `sync/push` + `sync/pull` cho thao tác hằng ngày (offline-first). CRUD dùng khi cần thao tác trực tiếp với server (web quản trị, màn hình chỉ chạy khi có mạng, công cụ nhập liệu, kiểm thử).');
-out('* `sync/push` kiểm tra **cùng schema** ở mục 6.4: thiếu trường bắt buộc, sai kiểu, sai enum → bản ghi vào `rejected` với `code: "validation_failed"` và `fields`. Trường app có mà schema chưa có được giữ nguyên.');
+out('* `sync/push` kiểm tra **cùng schema** ở mục 7.4: thiếu trường bắt buộc, sai kiểu, sai enum → bản ghi vào `rejected` với `code: "validation_failed"` và `fields`. Trường app có mà schema chưa có được giữ nguyên.');
 out();
-out('### 6.1 Quy ước chung');
+out('### 7.1 Quy ước chung');
 out();
 out('Mọi endpoint cần `Authorization: Bearer <accessToken>` và tài khoản đã thuộc một nhà trọ. Dữ liệu chỉ là của nhà trọ trong token.');
 out();
@@ -59,7 +59,7 @@ out('- `?limit=` 1-200 (mặc định 50), `?offset=`. `?isDemo=true|false`.');
 out();
 out('**Lỗi riêng của CRUD:** `400 validation_failed` (`fields[].code`: `required`, `invalid_type`, `too_long`, `out_of_range`, `invalid_format`, `invalid_enum`, `not_found` = liên kết không tồn tại), `403 forbidden` (quản lý vào bảng chỉ chủ trọ), `404 not_found`, `409 duplicate` (kèm `existingId`), `409 version_conflict`, `409 has_dependents`, `409 contract_overlap`, `409 append_only`, `409 period_locked`.');
 out();
-out('### 6.2 Luật nghiệp vụ');
+out('### 7.2 Luật nghiệp vụ');
 out();
 out('**Liên kết khi xóa:** *chặn xóa* = không xóa được bản ghi cha khi còn bản ghi này; *xóa theo* = xóa bản ghi cha thì bản ghi này bị xóa cùng.');
 out();
@@ -70,14 +70,14 @@ out('- Kỳ thu `status = locked`: không sửa được bảng tính tiền, d�
 out('- `collections`, `deposit-entries` chỉ ghi thêm: không PATCH (`409 append_only`); nhập nhầm thì xóa rồi ghi lại.');
 out('- `room-statements.paidAmount`, `collectStatus` (`unpaid`/`partial`/`paid`) tính từ các lần thu, không lưu.');
 out();
-out('### 6.3 Danh sách các phần');
+out('### 7.3 Danh sách các phần');
 out();
 out('| Phần | Đường dẫn | Chỉ chủ trọ |');
 out('|---|---|---|');
 for (const r of Object.values(RESOURCES)) out(`| ${r.label} | [\`/v1/${r.path}\`](#${r.path}) | ${OWNER_ONLY.has(r.table) ? 'có' : ''} |`);
 out();
 
-out('### 6.4 Trường của từng phần');
+out('### 7.4 Trường của từng phần');
 out();
 for (const r of Object.values(RESOURCES)) {
   out(`#### ${r.path}`);
@@ -114,4 +114,4 @@ const a = doc.indexOf('<!-- CRUD:START');
 const b = doc.indexOf('<!-- CRUD:END -->');
 if (a < 0 || b < 0) throw new Error('CRUD:START / CRUD:END markers not found in docs/API-cho-FE.md');
 fs.writeFileSync(file, `${doc.slice(0, a)}${lines.join('\n')}${doc.slice(b + '<!-- CRUD:END -->'.length)}`);
-console.log(`docs/API-cho-FE.md section 6: ${Object.keys(RESOURCES).length} resources`);
+console.log(`docs/API-cho-FE.md section 7: ${Object.keys(RESOURCES).length} resources`);

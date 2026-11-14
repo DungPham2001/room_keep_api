@@ -22,15 +22,30 @@ const optId = (c, obj, key, field) => {
   return v;
 };
 
-/** Validates `property` with Checker `c`; returns a normalized object (or undefined when invalid). */
-function parseProperty(c, body, prefix = 'property') {
+/**
+ * Validates `property` with Checker `c`; returns a normalized object (or undefined when invalid).
+ * `seed: false` (in the property or passed by the caller from the request root): the server creates no records at
+ * all (not even AppSettings / OnboardingStep); the app pushes its own after sign-up.
+ */
+function parseProperty(c, body, prefix = 'property', { seed } = {}) {
   const p = c.obj({ body }, 'body', { field: prefix, required: true });
   if (!p) return undefined;
   const out = {
     name: c.str(p, 'name', { field: `${prefix}.name`, required: true, max: 100 }),
     address: c.str(p, 'address', { field: `${prefix}.address`, max: 200 }) || '',
     phone: c.phone(p, 'phone', { field: `${prefix}.phone` }) || '',
+    seed: true,
   };
+  const seedIn = p.seed !== undefined ? p.seed : seed;
+  if (seedIn !== undefined) {
+    if (typeof seedIn !== 'boolean') c.fail('seed', 'invalid_type');
+    else out.seed = seedIn;
+  }
+  if (out.seed === false) {
+    // nothing would be created from these: refuse instead of silently dropping what the app sent
+    for (const k of ['billing', 'rates', 'layout']) if (p[k] !== undefined && p[k] !== null) c.fail(`${prefix}.${k}`, 'not_allowed');
+    return c.ok ? out : undefined;
+  }
 
   const b = c.obj(p, 'billing', { field: `${prefix}.billing` });
   if (b) {
@@ -176,8 +191,9 @@ function generateLayout({ blocks, floorsPerBlock, roomsPerFloor, defaultRent, ca
   return out;
 }
 
-/** Turns the normalized input into sync records [{ table, id, payload }]. */
+/** Turns the normalized input into sync records [{ table, id, payload }]. None when `seed` is false. */
 function seedRecords(input, { language = 'vi' } = {}) {
+  if (input.seed === false) return [];
   const now = new Date().toISOString();
   const day = today();
   const rec = (table, fields) => ({ table, id: fields.id, payload: { ...fields, updatedAt: now, isDeleted: false, isDemo: false } });
