@@ -165,10 +165,11 @@ test('login with email or the property phone (owner); phone follows the property
     assert.equal(b.account.email, 'lan@example.com', login);
   }
   await api.post('auth/login', { email: 'lan@example.com', password: PASSWORD }).expect(200); // older field still works
+  await api.post('auth/login', { phone: '0901234567', password: PASSWORD }).expect(200); // `phone` field also accepted
   assert.equal((await api.post('auth/login', { login: '0901234567', password: 'sai123456' }).expect(401)).body.code, 'invalid_credentials');
   assert.equal((await api.post('auth/login', { login: '0999999999', password: PASSWORD }).expect(401)).body.code, 'invalid_credentials');
   assert.deepEqual((await api.post('auth/login', { login: '12ab', password: PASSWORD }).expect(400)).body.fields, [{ field: 'login', code: 'invalid_format' }]);
-  assert.deepEqual((await api.post('auth/login', { password: PASSWORD }).expect(400)).body.fields[0], { field: 'email', code: 'required' });
+  assert.deepEqual((await api.post('auth/login', { password: PASSWORD }).expect(400)).body.fields[0], { field: 'login', code: 'required' });
 
   // the same phone cannot be used by a second property
   const dup = (await api.post('auth/register', { account: { email: 'other@example.com', password: PASSWORD, displayName: 'X' }, acceptTerms: true, property: { name: 'X', phone: '+84901234567' } }).expect(409)).body;
@@ -176,7 +177,8 @@ test('login with email or the property phone (owner); phone follows the property
   assert.deepEqual(dup.fields, [{ field: 'property.phone', code: 'phone_taken' }]);
 
   // changing the property phone changes the login phone
-  const t = r.tokens.accessToken;
+  // (fresh token: the logins above went past the 10-sessions cap, which revokes the oldest session)
+  const t = (await api.post('auth/login', { login: 'lan@example.com', password: PASSWORD }).expect(200)).body.tokens.accessToken;
   assert.equal((await api.patch('me', { phone: '0912 345 678' }, t).expect(200)).body.account.phone, '0912345678');
   await api.post('auth/login', { login: '0901234567', password: PASSWORD }).expect(401);
   await api.post('auth/login', { login: '0912345678', password: PASSWORD }).expect(200);

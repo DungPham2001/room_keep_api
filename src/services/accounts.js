@@ -55,12 +55,12 @@ const loginPhoneOf = (propertyPhone) => normalizePhone(propertyPhone || '') || n
 const phoneTaken = (phone, exceptId) => (phone ? Account.exists({ phone, ...(exceptId ? { _id: { $ne: exceptId } } : {}) }) : null);
 
 /**
- * Login identifier: `login` (email or phone), or the older `email` field.
+ * Login identifier: `login` (email or phone), or `phone` / the older `email` field.
  * Returns { kind: 'email'|'phone', value } (normalized) or fails the field.
  */
 function loginField(c, body) {
-  const field = body?.login !== undefined ? 'login' : 'email';
-  const raw = body?.login !== undefined ? body.login : body?.email;
+  const field = ['login', 'phone', 'email'].find((k) => body?.[k] !== undefined && body[k] !== null && body[k] !== '') || 'login';
+  const raw = body?.[field];
   if (raw === undefined || raw === null || (typeof raw === 'string' && !raw.trim())) return c.fail(field, 'required');
   if (typeof raw !== 'string' || raw.length > 254) return c.fail(field, 'invalid_type');
   if (raw.includes('@')) {

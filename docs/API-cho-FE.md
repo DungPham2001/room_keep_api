@@ -149,7 +149,7 @@ Bản ghi sinh sẵn (khi không có `seed: false`): `AppSettings` (id `"main"`)
 `{ "login": "<email hoặc số điện thoại>", "password", "deviceName", "deviceId" }` → `{ account, property, role, tokens }`.
 * `login` có `@` → email (không phân biệt hoa thường); không có `@` → số điện thoại. Server tự chuẩn hóa SĐT: `0901 234 567`, `090.123.4567`, `+84 901 234 567`, `84901234567` đều là `0901234567`. App cứ gửi nguyên chuỗi người dùng gõ, một ô nhập chung "Email hoặc số điện thoại".
 * **SĐT đăng nhập = SĐT nhà trọ của chủ trọ** (`account.phone` trong phản hồi). Sửa SĐT nhà trọ (`PATCH /v1/me` trường `phone`, `PATCH /v1/settings`, hoặc push `AppSettings.phone`) thì SĐT đăng nhập đổi theo. **Quản lý** không có SĐT đăng nhập (`account.phone = null`), đăng nhập bằng email.
-* Trường `email` cũ vẫn nhận (tương đương `login`).
+* Server cũng nhận tên trường `phone` hoặc `email` thay cho `login` (gửi một trong ba). Thiếu cả ba → `400`, `fields: [{ field: "login", code: "required" }]`.
 * Sai thông tin → `401 invalid_credentials` (không cho biết sai email/SĐT hay sai mật khẩu). `login` không phải email cũng không phải SĐT → `400`, `fields: [{ field: "login", code: "invalid_format" }]`.
 * Sai 5 lần/15 phút → `429 too_many_attempts`; tính theo tài khoản, nhập email hay SĐT đều cộng chung.
 * Đăng nhập lại từ cùng `deviceId` sẽ thay phiên cũ của máy đó.
@@ -1431,7 +1431,7 @@ Response:
   "apiVersion": "1.0.0",
   "minAppVersion": "1.0.0",
   "latestAppVersion": "1.0.0",
-  "serverTime": "2026-11-14T19:03:08Z"
+  "serverTime": "2026-11-14T19:18:20Z"
 }
 ```
 
@@ -1470,33 +1470,33 @@ Response:
 ```json
 {
   "account": {
-    "id": "bd0b1695-6a3e-4fc2-bab7-a6bd5f68fc5f",
+    "id": "e5580e26-ebd1-4f29-8cee-672b0954a2f5",
     "email": "chu@example.com",
     "phone": "0901234567",
     "displayName": "Cô Lan",
     "preferredLanguage": "vi",
     "role": "owner",
-    "propertyId": "d2947763-4109-45f1-bf1c-35a44fbdfb99",
-    "createdAt": "2026-11-14T19:03:08Z"
+    "propertyId": "4d4235c2-da2a-42d2-ad28-98986a60d988",
+    "createdAt": "2026-11-14T19:18:20Z"
   },
   "property": {
-    "id": "d2947763-4109-45f1-bf1c-35a44fbdfb99",
+    "id": "4d4235c2-da2a-42d2-ad28-98986a60d988",
     "name": "Nhà trọ Hoa Sen",
     "address": "12 Lê Lợi",
     "phone": "0901234567",
-    "ownerId": "bd0b1695-6a3e-4fc2-bab7-a6bd5f68fc5f",
-    "createdAt": "2026-11-14T19:03:08Z"
+    "ownerId": "e5580e26-ebd1-4f29-8cee-672b0954a2f5",
+    "createdAt": "2026-11-14T19:18:20Z"
   },
   "role": "owner",
   "tokens": {
     "tokenType": "Bearer",
     "accessToken": "eyJhbGciOiJIUzI1NiIsInR5…",
-    "accessTokenExpiresAt": "2026-11-14T21:03:08Z",
-    "expiresIn": 7199,
-    "refreshToken": "62c9f0c8-4798-4988-8a72-…",
-    "refreshTokenExpiresAt": "2026-11-14T22:03:08Z",
-    "sessionExpiresAt": "2026-11-15T07:03:08Z",
-    "deviceId": "62c9f0c8-4798-4988-8a72-0be7fab2c062"
+    "accessTokenExpiresAt": "2026-11-14T21:18:21Z",
+    "expiresIn": 7200,
+    "refreshToken": "30657be7-32cb-4007-85fa-…",
+    "refreshTokenExpiresAt": "2026-11-14T22:18:21Z",
+    "sessionExpiresAt": "2026-11-15T07:18:21Z",
+    "deviceId": "30657be7-32cb-4007-85fa-4709a67addcb"
   },
   "changes": [],
   "rev": 0,
@@ -1583,33 +1583,33 @@ Response:
 ```json
 {
   "account": {
-    "id": "29d65311-c37b-4b51-92c7-d77b1a6f82f7",
+    "id": "00e9cde5-50ee-4830-b8e8-d210dfe20835",
     "email": "chu2@example.com",
     "phone": null,
     "displayName": "Chú Tư",
     "preferredLanguage": "vi",
     "role": "owner",
-    "propertyId": "685a3f6e-c0cf-44fe-a902-8cc7e4607fd9",
-    "createdAt": "2026-11-14T19:03:08Z"
+    "propertyId": "475cbfdc-3679-47b6-867c-d3e8d6cd4aa1",
+    "createdAt": "2026-11-14T19:18:21Z"
   },
   "property": {
-    "id": "685a3f6e-c0cf-44fe-a902-8cc7e4607fd9",
+    "id": "475cbfdc-3679-47b6-867c-d3e8d6cd4aa1",
     "name": "Trọ Bình An",
     "address": "",
     "phone": "",
-    "ownerId": "29d65311-c37b-4b51-92c7-d77b1a6f82f7",
-    "createdAt": "2026-11-14T19:03:08Z"
+    "ownerId": "00e9cde5-50ee-4830-b8e8-d210dfe20835",
+    "createdAt": "2026-11-14T19:18:21Z"
   },
   "role": "owner",
   "tokens": {
     "tokenType": "Bearer",
     "accessToken": "eyJhbGciOiJIUzI1NiIsInR5…",
-    "accessTokenExpiresAt": "2026-11-14T21:03:08Z",
-    "expiresIn": 7199,
-    "refreshToken": "1c023d4a-d96d-4320-86c6-…",
-    "refreshTokenExpiresAt": "2026-11-14T22:03:08Z",
-    "sessionExpiresAt": "2026-11-15T07:03:08Z",
-    "deviceId": "1c023d4a-d96d-4320-86c6-07dce853ec99"
+    "accessTokenExpiresAt": "2026-11-14T21:18:21Z",
+    "expiresIn": 7200,
+    "refreshToken": "c0bd6402-dee1-42af-9c1f-…",
+    "refreshTokenExpiresAt": "2026-11-14T22:18:21Z",
+    "sessionExpiresAt": "2026-11-15T07:18:21Z",
+    "deviceId": "c0bd6402-dee1-42af-9c1f-3e689c0190d2"
   },
   "changes": [
     {
@@ -1618,8 +1618,8 @@ Response:
       "rev": 1,
       "op": "upsert",
       "isDeleted": false,
-      "updatedAt": "2026-11-14T19:03:08.854Z",
-      "serverUpdatedAt": "2026-11-14T19:03:08Z",
+      "updatedAt": "2026-11-14T19:18:21.030Z",
+      "serverUpdatedAt": "2026-11-14T19:18:21Z",
       "payload": {
         "id": "main",
         "language": "vi",
@@ -1633,45 +1633,45 @@ Response:
         "roundingStep": 1000,
         "dateFormat": "dd/MM/yyyy",
         "rulesText": "",
-        "updatedAt": "2026-11-14T19:03:08.854Z",
+        "updatedAt": "2026-11-14T19:18:21.030Z",
         "isDeleted": false,
         "isDemo": false
       }
     },
     {
       "table": "ElectricityTier",
-      "id": "01497a33-4b83-4faf-b5e0-74fa83628c78",
+      "id": "965b490f-aa52-4be5-b58b-d4d932cf2f63",
       "rev": 2,
       "op": "upsert",
       "isDeleted": false,
-      "updatedAt": "2026-11-14T19:03:08.854Z",
-      "serverUpdatedAt": "2026-11-14T19:03:08Z",
+      "updatedAt": "2026-11-14T19:18:21.030Z",
+      "serverUpdatedAt": "2026-11-14T19:18:21Z",
       "payload": {
-        "id": "01497a33-4b83-4faf-b5e0-74fa83628c78",
+        "id": "965b490f-aa52-4be5-b58b-d4d932cf2f63",
         "name": "Đồng giá",
         "fromKwh": 0,
         "toKwh": null,
         "pricePerKwh": 3500,
         "effectiveFrom": "2026-11-15",
-        "updatedAt": "2026-11-14T19:03:08.854Z",
+        "updatedAt": "2026-11-14T19:18:21.030Z",
         "isDeleted": false,
         "isDemo": false
       }
     },
     {
       "table": "WaterRate",
-      "id": "e93ffa89-3594-44a9-8656-98d5e17096f5",
+      "id": "a032d63a-209e-41fa-ad5c-1d0aa109eeb0",
       "rev": 3,
       "op": "upsert",
       "isDeleted": false,
-      "updatedAt": "2026-11-14T19:03:08.854Z",
-      "serverUpdatedAt": "2026-11-14T19:03:08Z",
+      "updatedAt": "2026-11-14T19:18:21.030Z",
+      "serverUpdatedAt": "2026-11-14T19:18:21Z",
       "payload": {
-        "id": "e93ffa89-3594-44a9-8656-98d5e17096f5",
+        "id": "a032d63a-209e-41fa-ad5c-1d0aa109eeb0",
         "mode": "per_m3",
         "pricePerUnit": 18000,
         "effectiveFrom": "2026-11-15",
-        "updatedAt": "2026-11-14T19:03:08.854Z",
+        "updatedAt": "2026-11-14T19:18:21.030Z",
         "isDeleted": false,
         "isDemo": false
       }
@@ -1704,33 +1704,33 @@ Response:
 ```json
 {
   "account": {
-    "id": "bd0b1695-6a3e-4fc2-bab7-a6bd5f68fc5f",
+    "id": "e5580e26-ebd1-4f29-8cee-672b0954a2f5",
     "email": "chu@example.com",
     "phone": "0901234567",
     "displayName": "Cô Lan",
     "preferredLanguage": "vi",
     "role": "owner",
-    "propertyId": "d2947763-4109-45f1-bf1c-35a44fbdfb99",
-    "createdAt": "2026-11-14T19:03:08Z"
+    "propertyId": "4d4235c2-da2a-42d2-ad28-98986a60d988",
+    "createdAt": "2026-11-14T19:18:20Z"
   },
   "property": {
-    "id": "d2947763-4109-45f1-bf1c-35a44fbdfb99",
+    "id": "4d4235c2-da2a-42d2-ad28-98986a60d988",
     "name": "Nhà trọ Hoa Sen",
     "address": "12 Lê Lợi",
     "phone": "0901234567",
-    "ownerId": "bd0b1695-6a3e-4fc2-bab7-a6bd5f68fc5f",
-    "createdAt": "2026-11-14T19:03:08Z"
+    "ownerId": "e5580e26-ebd1-4f29-8cee-672b0954a2f5",
+    "createdAt": "2026-11-14T19:18:20Z"
   },
   "role": "owner",
   "tokens": {
     "tokenType": "Bearer",
     "accessToken": "eyJhbGciOiJIUzI1NiIsInR5…",
-    "accessTokenExpiresAt": "2026-11-14T21:03:08Z",
-    "expiresIn": 7199,
-    "refreshToken": "385aef73-101e-4c53-8d79-…",
-    "refreshTokenExpiresAt": "2026-11-14T22:03:08Z",
-    "sessionExpiresAt": "2026-11-15T07:03:08Z",
-    "deviceId": "385aef73-101e-4c53-8d79-86cb997d25ff"
+    "accessTokenExpiresAt": "2026-11-14T21:18:21Z",
+    "expiresIn": 7200,
+    "refreshToken": "b004eeba-b084-4ba9-a98b-…",
+    "refreshTokenExpiresAt": "2026-11-14T22:18:21Z",
+    "sessionExpiresAt": "2026-11-15T07:18:21Z",
+    "deviceId": "b004eeba-b084-4ba9-a98b-7b54a990ce93"
   }
 }
 ```
@@ -1756,33 +1756,33 @@ Response:
 ```json
 {
   "account": {
-    "id": "bd0b1695-6a3e-4fc2-bab7-a6bd5f68fc5f",
+    "id": "e5580e26-ebd1-4f29-8cee-672b0954a2f5",
     "email": "chu@example.com",
     "phone": "0901234567",
     "displayName": "Cô Lan",
     "preferredLanguage": "vi",
     "role": "owner",
-    "propertyId": "d2947763-4109-45f1-bf1c-35a44fbdfb99",
-    "createdAt": "2026-11-14T19:03:08Z"
+    "propertyId": "4d4235c2-da2a-42d2-ad28-98986a60d988",
+    "createdAt": "2026-11-14T19:18:20Z"
   },
   "property": {
-    "id": "d2947763-4109-45f1-bf1c-35a44fbdfb99",
+    "id": "4d4235c2-da2a-42d2-ad28-98986a60d988",
     "name": "Nhà trọ Hoa Sen",
     "address": "12 Lê Lợi",
     "phone": "0901234567",
-    "ownerId": "bd0b1695-6a3e-4fc2-bab7-a6bd5f68fc5f",
-    "createdAt": "2026-11-14T19:03:08Z"
+    "ownerId": "e5580e26-ebd1-4f29-8cee-672b0954a2f5",
+    "createdAt": "2026-11-14T19:18:20Z"
   },
   "role": "owner",
   "tokens": {
     "tokenType": "Bearer",
     "accessToken": "eyJhbGciOiJIUzI1NiIsInR5…",
-    "accessTokenExpiresAt": "2026-11-14T21:03:08Z",
-    "expiresIn": 7199,
-    "refreshToken": "fcfa6edf-207e-4e90-a44e-…",
-    "refreshTokenExpiresAt": "2026-11-14T22:03:08Z",
-    "sessionExpiresAt": "2026-11-15T07:03:08Z",
-    "deviceId": "fcfa6edf-207e-4e90-a44e-2c21c42fc781"
+    "accessTokenExpiresAt": "2026-11-14T21:18:21Z",
+    "expiresIn": 7200,
+    "refreshToken": "629b7fab-fd0e-42dd-85f6-…",
+    "refreshTokenExpiresAt": "2026-11-14T22:18:21Z",
+    "sessionExpiresAt": "2026-11-15T07:18:21Z",
+    "deviceId": "629b7fab-fd0e-42dd-85f6-3ffa49ae74f6"
   }
 }
 ```
@@ -1799,7 +1799,7 @@ Content-Type: application/json
 ```
 ```json
 {
-  "refreshToken": "fcfa6edf-207e-4e90-a44e-2c21c42fc781.YHQw3RJYZp3QhQh6gpQj-JphymTtrE7oz441I76JMUM"
+  "refreshToken": "629b7fab-fd0e-42dd-85f6-3ffa49ae74f6.UHDUtiIPBFpFKJRCZ98nkAqBf3LNpkPXQpQUBAHn7HE"
 }
 ```
 Response:
@@ -1808,12 +1808,12 @@ Response:
   "tokens": {
     "tokenType": "Bearer",
     "accessToken": "eyJhbGciOiJIUzI1NiIsInR5…",
-    "accessTokenExpiresAt": "2026-11-14T21:03:08Z",
-    "expiresIn": 7199,
-    "refreshToken": "fcfa6edf-207e-4e90-a44e-…",
-    "refreshTokenExpiresAt": "2026-11-14T22:03:08Z",
-    "sessionExpiresAt": "2026-11-15T07:03:08Z",
-    "deviceId": "fcfa6edf-207e-4e90-a44e-2c21c42fc781"
+    "accessTokenExpiresAt": "2026-11-14T21:18:21Z",
+    "expiresIn": 7200,
+    "refreshToken": "629b7fab-fd0e-42dd-85f6-…",
+    "refreshTokenExpiresAt": "2026-11-14T22:18:21Z",
+    "sessionExpiresAt": "2026-11-15T07:18:21Z",
+    "deviceId": "629b7fab-fd0e-42dd-85f6-3ffa49ae74f6"
   }
 }
 ```
@@ -1832,22 +1832,22 @@ Response:
 ```json
 {
   "account": {
-    "id": "bd0b1695-6a3e-4fc2-bab7-a6bd5f68fc5f",
+    "id": "e5580e26-ebd1-4f29-8cee-672b0954a2f5",
     "email": "chu@example.com",
     "phone": "0901234567",
     "displayName": "Cô Lan",
     "preferredLanguage": "vi",
     "role": "owner",
-    "propertyId": "d2947763-4109-45f1-bf1c-35a44fbdfb99",
-    "createdAt": "2026-11-14T19:03:08Z"
+    "propertyId": "4d4235c2-da2a-42d2-ad28-98986a60d988",
+    "createdAt": "2026-11-14T19:18:20Z"
   },
   "property": {
-    "id": "d2947763-4109-45f1-bf1c-35a44fbdfb99",
+    "id": "4d4235c2-da2a-42d2-ad28-98986a60d988",
     "name": "Nhà trọ Hoa Sen",
     "address": "12 Lê Lợi",
     "phone": "0901234567",
-    "ownerId": "bd0b1695-6a3e-4fc2-bab7-a6bd5f68fc5f",
-    "createdAt": "2026-11-14T19:03:08Z"
+    "ownerId": "e5580e26-ebd1-4f29-8cee-672b0954a2f5",
+    "createdAt": "2026-11-14T19:18:20Z"
   },
   "role": "owner"
 }
@@ -1873,22 +1873,22 @@ Response:
 ```json
 {
   "account": {
-    "id": "bd0b1695-6a3e-4fc2-bab7-a6bd5f68fc5f",
+    "id": "e5580e26-ebd1-4f29-8cee-672b0954a2f5",
     "email": "chu@example.com",
     "phone": "0901234567",
     "displayName": "Cô Lan Anh",
     "preferredLanguage": "vi",
     "role": "owner",
-    "propertyId": "d2947763-4109-45f1-bf1c-35a44fbdfb99",
-    "createdAt": "2026-11-14T19:03:08Z"
+    "propertyId": "4d4235c2-da2a-42d2-ad28-98986a60d988",
+    "createdAt": "2026-11-14T19:18:20Z"
   },
   "property": {
-    "id": "d2947763-4109-45f1-bf1c-35a44fbdfb99",
+    "id": "4d4235c2-da2a-42d2-ad28-98986a60d988",
     "name": "Nhà trọ Hoa Sen",
     "address": "12 Lê Lợi",
     "phone": "0901234567",
-    "ownerId": "bd0b1695-6a3e-4fc2-bab7-a6bd5f68fc5f",
-    "createdAt": "2026-11-14T19:03:08Z"
+    "ownerId": "e5580e26-ebd1-4f29-8cee-672b0954a2f5",
+    "createdAt": "2026-11-14T19:18:20Z"
   },
   "role": "owner"
 }
@@ -1908,11 +1908,11 @@ Response:
 {
   "devices": [
     {
-      "id": "fcfa6edf-207e-4e90-a44e-2c21c42fc781",
+      "id": "629b7fab-fd0e-42dd-85f6-3ffa49ae74f6",
       "name": "Pixel 8",
-      "createdAt": "2026-11-14T19:03:08Z",
-      "lastSeenAt": "2026-11-14T19:03:08Z",
-      "expiresAt": "2026-11-15T07:03:08Z",
+      "createdAt": "2026-11-14T19:18:21Z",
+      "lastSeenAt": "2026-11-14T19:18:21Z",
+      "expiresAt": "2026-11-15T07:18:21Z",
       "isCurrent": true
     }
   ]
@@ -1940,7 +1940,7 @@ Response:
 ```json
 {
   "status": "accepted",
-  "devToken": "68YT-CBZ7"
+  "devToken": "78CB-E3KC"
 }
 ```
 * **Production chỉ trả `{ "status": "accepted" }`.** `devToken` chỉ có ở môi trường dev chưa cấu hình email (như lúc chụp ví dụ này); mã thật nằm trong email.
@@ -1956,7 +1956,7 @@ Content-Type: application/json
 ```
 ```json
 {
-  "token": "68YT-CBZ7",
+  "token": "78CB-E3KC",
   "newPassword": "Matkhau2027"
 }
 ```
@@ -2190,7 +2190,7 @@ Response:
         "op": "upsert",
         "isDeleted": false,
         "updatedAt": null,
-        "serverUpdatedAt": "2026-11-14T19:03:09Z",
+        "serverUpdatedAt": "2026-11-14T19:18:21Z",
         "payload": {
           "floorId": "flr-a1",
           "name": "A101",
@@ -2265,7 +2265,7 @@ Response:
       "op": "upsert",
       "isDeleted": false,
       "updatedAt": "2026-11-15T08:00:00Z",
-      "serverUpdatedAt": "2026-11-14T19:03:09Z",
+      "serverUpdatedAt": "2026-11-14T19:18:21Z",
       "payload": {
         "propertyName": "Nhà trọ Hoa Sen",
         "meterDay": 28,
@@ -2285,7 +2285,7 @@ Response:
       "op": "upsert",
       "isDeleted": false,
       "updatedAt": null,
-      "serverUpdatedAt": "2026-11-14T19:03:09Z",
+      "serverUpdatedAt": "2026-11-14T19:18:21Z",
       "payload": {
         "name": "Dãy A",
         "sortOrder": 0,
@@ -2301,7 +2301,7 @@ Response:
       "op": "upsert",
       "isDeleted": false,
       "updatedAt": null,
-      "serverUpdatedAt": "2026-11-14T19:03:09Z",
+      "serverUpdatedAt": "2026-11-14T19:18:21Z",
       "payload": {
         "blockId": "blk-a",
         "label": "Tầng 1",
@@ -2340,7 +2340,7 @@ Response:
       "op": "upsert",
       "isDeleted": false,
       "updatedAt": null,
-      "serverUpdatedAt": "2026-11-14T19:03:09Z",
+      "serverUpdatedAt": "2026-11-14T19:18:21Z",
       "payload": {
         "floorId": "flr-a1",
         "name": "A101",
@@ -2373,7 +2373,7 @@ Response:
 {
   "serverRev": 7,
   "purgedRev": 0,
-  "lastChangeAt": "2026-11-14T19:03:09Z",
+  "lastChangeAt": "2026-11-14T19:18:21Z",
   "tables": {
     "AppSettings": 1,
     "Block": 1,
@@ -2410,8 +2410,8 @@ Response:
       "note": null,
       "isDemo": false,
       "rev": 6,
-      "createdAt": "2026-11-14T19:03:09Z",
-      "updatedAt": "2026-11-14T19:03:09Z"
+      "createdAt": "2026-11-14T19:18:21Z",
+      "updatedAt": "2026-11-14T19:18:21Z"
     }
   ],
   "page": {
@@ -2456,8 +2456,8 @@ Response:
   "note": null,
   "isDemo": false,
   "rev": 8,
-  "createdAt": "2026-11-14T19:03:09Z",
-  "updatedAt": "2026-11-14T19:03:09Z"
+  "createdAt": "2026-11-14T19:18:21Z",
+  "updatedAt": "2026-11-14T19:18:21Z"
 }
 ```
 
@@ -2484,8 +2484,8 @@ Response:
   "note": null,
   "isDemo": false,
   "rev": 8,
-  "createdAt": "2026-11-14T19:03:09Z",
-  "updatedAt": "2026-11-14T19:03:09Z"
+  "createdAt": "2026-11-14T19:18:21Z",
+  "updatedAt": "2026-11-14T19:18:21Z"
 }
 ```
 
@@ -2520,8 +2520,8 @@ Response:
   "note": "Sửa trần",
   "isDemo": false,
   "rev": 9,
-  "createdAt": "2026-11-14T19:03:09Z",
-  "updatedAt": "2026-11-14T19:03:09Z"
+  "createdAt": "2026-11-14T19:18:21Z",
+  "updatedAt": "2026-11-14T19:18:21Z"
 }
 ```
 
@@ -2549,8 +2549,8 @@ Response:
       "note": null,
       "isDemo": false,
       "rev": 10,
-      "createdAt": "2026-11-14T19:03:09Z",
-      "updatedAt": "2026-11-14T19:03:09Z"
+      "createdAt": "2026-11-14T19:18:21Z",
+      "updatedAt": "2026-11-14T19:18:21Z"
     },
     {
       "id": "ten-3",
@@ -2563,8 +2563,8 @@ Response:
       "note": null,
       "isDemo": false,
       "rev": 11,
-      "createdAt": "2026-11-14T19:03:09Z",
-      "updatedAt": "2026-11-14T19:03:09Z"
+      "createdAt": "2026-11-14T19:18:21Z",
+      "updatedAt": "2026-11-14T19:18:21Z"
     }
   ],
   "page": {
@@ -2598,7 +2598,7 @@ Content-Type: application/json
 Response:
 ```json
 {
-  "id": "81f73e3e-620d-4dea-b408-98c4684ca86a",
+  "id": "a057fa17-62b2-4332-81b9-9b805a32c044",
   "roomId": "room-a102",
   "leaderTenantId": "ten-2",
   "startDate": "2026-11-01",
@@ -2612,8 +2612,8 @@ Response:
   "renewedFromId": null,
   "isDemo": false,
   "rev": 12,
-  "createdAt": "2026-11-14T19:03:09Z",
-  "updatedAt": "2026-11-14T19:03:09Z"
+  "createdAt": "2026-11-14T19:18:21Z",
+  "updatedAt": "2026-11-14T19:18:21Z"
 }
 ```
 
@@ -2629,9 +2629,9 @@ Content-Type: application/json
 ```
 ```json
 {
-  "cycleId": "483233d8-4344-4ed5-b197-1337aad2938b",
+  "cycleId": "29a459d0-5f6c-4125-afc5-0fb60b01143c",
   "roomId": "room-a102",
-  "contractId": "81f73e3e-620d-4dea-b408-98c4684ca86a",
+  "contractId": "a057fa17-62b2-4332-81b9-9b805a32c044",
   "rentAmount": 2500000,
   "electricAmount": 350000,
   "waterAmount": 72000,
@@ -2642,10 +2642,10 @@ Content-Type: application/json
 Response:
 ```json
 {
-  "id": "79a2295e-6406-4771-ac90-66bfeaf29c08",
-  "cycleId": "483233d8-4344-4ed5-b197-1337aad2938b",
+  "id": "7be0afd0-87aa-4fe5-81b8-93074128760c",
+  "cycleId": "29a459d0-5f6c-4125-afc5-0fb60b01143c",
   "roomId": "room-a102",
-  "contractId": "81f73e3e-620d-4dea-b408-98c4684ca86a",
+  "contractId": "a057fa17-62b2-4332-81b9-9b805a32c044",
   "rentAmount": 2500000,
   "electricAmount": 350000,
   "waterAmount": 72000,
@@ -2660,27 +2660,27 @@ Response:
   "collectStatus": "unpaid",
   "isDemo": false,
   "rev": 14,
-  "createdAt": "2026-11-14T19:03:09Z",
-  "updatedAt": "2026-11-14T19:03:09Z"
+  "createdAt": "2026-11-14T19:18:21Z",
+  "updatedAt": "2026-11-14T19:18:21Z"
 }
 ```
 
 #### Bảng tính tiền sau một lần thu (`paidAmount`, `collectStatus` tính sẵn)
 
-`GET /v1/room-statements/79a2295e-6406-4771-ac90-66bfeaf29c08` → **200**
+`GET /v1/room-statements/7be0afd0-87aa-4fe5-81b8-93074128760c` → **200**
 
 Request:
 ```http
-GET https://roomkeepapi-ivory.vercel.app/v1/room-statements/79a2295e-6406-4771-ac90-66bfeaf29c08
+GET https://roomkeepapi-ivory.vercel.app/v1/room-statements/7be0afd0-87aa-4fe5-81b8-93074128760c
 Authorization: Bearer <accessToken>
 ```
 Response:
 ```json
 {
-  "id": "79a2295e-6406-4771-ac90-66bfeaf29c08",
-  "cycleId": "483233d8-4344-4ed5-b197-1337aad2938b",
+  "id": "7be0afd0-87aa-4fe5-81b8-93074128760c",
+  "cycleId": "29a459d0-5f6c-4125-afc5-0fb60b01143c",
   "roomId": "room-a102",
-  "contractId": "81f73e3e-620d-4dea-b408-98c4684ca86a",
+  "contractId": "a057fa17-62b2-4332-81b9-9b805a32c044",
   "rentAmount": 2500000,
   "electricAmount": 350000,
   "waterAmount": 72000,
@@ -2695,8 +2695,8 @@ Response:
   "collectStatus": "partial",
   "isDemo": false,
   "rev": 14,
-  "createdAt": "2026-11-14T19:03:09Z",
-  "updatedAt": "2026-11-14T19:03:09Z"
+  "createdAt": "2026-11-14T19:18:21Z",
+  "updatedAt": "2026-11-14T19:18:21Z"
 }
 ```
 
@@ -2727,8 +2727,8 @@ Response:
   "theme": null,
   "isDemo": false,
   "rev": 1,
-  "createdAt": "2026-11-14T19:03:09Z",
-  "updatedAt": "2026-11-14T19:03:09Z"
+  "createdAt": "2026-11-14T19:18:21Z",
+  "updatedAt": "2026-11-14T19:18:21Z"
 }
 ```
 
@@ -2766,11 +2766,11 @@ Content-Type: application/json
 Response:
 ```json
 {
-  "id": "ac058549-b9f3-4dd4-932a-8795353b520e",
-  "code": "LJGZCHZ5",
+  "id": "6df28c6a-1366-40ff-b661-46f4a73ccd9d",
+  "code": "NUXK4B8G",
   "role": "manager",
-  "expiresAt": "2026-11-16T19:03:09Z",
-  "createdAt": "2026-11-14T19:03:09Z",
+  "expiresAt": "2026-11-16T19:18:21Z",
+  "createdAt": "2026-11-14T19:18:21Z",
   "status": "active",
   "usedAt": null
 }
@@ -2793,7 +2793,7 @@ Content-Type: application/json
     "displayName": "Quản lý Hùng"
   },
   "acceptTerms": true,
-  "inviteCode": "LJGZCHZ5",
+  "inviteCode": "NUXK4B8G",
   "deviceName": "Redmi 13"
 }
 ```
@@ -2801,33 +2801,33 @@ Response:
 ```json
 {
   "account": {
-    "id": "082a00b2-0c06-476a-b146-e8cb65c0d563",
+    "id": "4327eb6c-b8ad-4907-9f97-bbe94964b7e2",
     "email": "quanly@example.com",
     "phone": null,
     "displayName": "Quản lý Hùng",
     "preferredLanguage": "vi",
     "role": "manager",
-    "propertyId": "d2947763-4109-45f1-bf1c-35a44fbdfb99",
-    "createdAt": "2026-11-14T19:03:09Z"
+    "propertyId": "4d4235c2-da2a-42d2-ad28-98986a60d988",
+    "createdAt": "2026-11-14T19:18:21Z"
   },
   "property": {
-    "id": "d2947763-4109-45f1-bf1c-35a44fbdfb99",
+    "id": "4d4235c2-da2a-42d2-ad28-98986a60d988",
     "name": "Nhà trọ Hoa Sen",
     "address": "12 Lê Lợi",
     "phone": "0901234567",
-    "ownerId": "bd0b1695-6a3e-4fc2-bab7-a6bd5f68fc5f",
-    "createdAt": "2026-11-14T19:03:08Z"
+    "ownerId": "e5580e26-ebd1-4f29-8cee-672b0954a2f5",
+    "createdAt": "2026-11-14T19:18:20Z"
   },
   "role": "manager",
   "tokens": {
     "tokenType": "Bearer",
     "accessToken": "eyJhbGciOiJIUzI1NiIsInR5…",
-    "accessTokenExpiresAt": "2026-11-14T21:03:09Z",
+    "accessTokenExpiresAt": "2026-11-14T21:18:21Z",
     "expiresIn": 7200,
-    "refreshToken": "eb626049-ebd1-46f8-93cc-…",
-    "refreshTokenExpiresAt": "2026-11-14T22:03:09Z",
-    "sessionExpiresAt": "2026-11-15T07:03:09Z",
-    "deviceId": "eb626049-ebd1-46f8-93cc-9a35f6575ee0"
+    "refreshToken": "1a3d1f50-bce3-4ba1-a2a5-…",
+    "refreshTokenExpiresAt": "2026-11-14T22:18:21Z",
+    "sessionExpiresAt": "2026-11-15T07:18:21Z",
+    "deviceId": "1a3d1f50-bce3-4ba1-a2a5-b0d6a1b3db49"
   },
   "changes": [
     {
@@ -2837,7 +2837,7 @@ Response:
       "op": "upsert",
       "isDeleted": false,
       "updatedAt": "2026-11-15T08:00:00Z",
-      "serverUpdatedAt": "2026-11-14T19:03:09Z",
+      "serverUpdatedAt": "2026-11-14T19:18:21Z",
       "payload": {
         "propertyName": "Nhà trọ Hoa Sen",
         "meterDay": 28,
@@ -2857,7 +2857,7 @@ Response:
       "op": "upsert",
       "isDeleted": false,
       "updatedAt": null,
-      "serverUpdatedAt": "2026-11-14T19:03:09Z",
+      "serverUpdatedAt": "2026-11-14T19:18:21Z",
       "payload": {
         "name": "Dãy A",
         "sortOrder": 0,
@@ -2873,7 +2873,7 @@ Response:
       "op": "upsert",
       "isDeleted": false,
       "updatedAt": null,
-      "serverUpdatedAt": "2026-11-14T19:03:09Z",
+      "serverUpdatedAt": "2026-11-14T19:18:21Z",
       "payload": {
         "blockId": "blk-a",
         "label": "Tầng 1",
@@ -2904,18 +2904,18 @@ Response:
 {
   "members": [
     {
-      "accountId": "bd0b1695-6a3e-4fc2-bab7-a6bd5f68fc5f",
+      "accountId": "e5580e26-ebd1-4f29-8cee-672b0954a2f5",
       "displayName": "Cô Lan Anh",
       "email": "chu@example.com",
       "role": "owner",
-      "joinedAt": "2026-11-14T19:03:08Z"
+      "joinedAt": "2026-11-14T19:18:20Z"
     },
     {
-      "accountId": "082a00b2-0c06-476a-b146-e8cb65c0d563",
+      "accountId": "4327eb6c-b8ad-4907-9f97-bbe94964b7e2",
       "displayName": "Quản lý Hùng",
       "email": "quanly@example.com",
       "role": "manager",
-      "joinedAt": "2026-11-14T19:03:09Z"
+      "joinedAt": "2026-11-14T19:18:21Z"
     }
   ]
 }
@@ -2937,7 +2937,7 @@ Content-Type: application/json
 ```
 ```json
 {
-  "statementId": "79a2295e-6406-4771-ac90-66bfeaf29c08",
+  "statementId": "7be0afd0-87aa-4fe5-81b8-93074128760c",
   "amount": 1042000,
   "paidAt": "2026-11-10",
   "methodNote": "Chuyển khoản"
@@ -2946,25 +2946,25 @@ Content-Type: application/json
 Response:
 ```json
 {
-  "id": "edf8dce7-d6de-49fb-adbf-8460fdb41c83",
-  "statementId": "79a2295e-6406-4771-ac90-66bfeaf29c08",
+  "id": "2b8a348b-49eb-4e5a-a121-1667759136f3",
+  "statementId": "7be0afd0-87aa-4fe5-81b8-93074128760c",
   "amount": 1042000,
   "paidAt": "2026-11-10",
   "methodNote": "Chuyển khoản",
   "isDemo": false,
   "rev": 18,
-  "createdAt": "2026-11-14T19:03:09Z",
-  "updatedAt": "2026-11-14T19:03:09Z"
+  "createdAt": "2026-11-14T19:18:21Z",
+  "updatedAt": "2026-11-14T19:18:21Z"
 }
 ```
 
 #### Các lần thu của một bảng tính tiền
 
-`GET /v1/collections?statementId=79a2295e-6406-4771-ac90-66bfeaf29c08` → **200**
+`GET /v1/collections?statementId=7be0afd0-87aa-4fe5-81b8-93074128760c` → **200**
 
 Request:
 ```http
-GET https://roomkeepapi-ivory.vercel.app/v1/collections?statementId=79a2295e-6406-4771-ac90-66bfeaf29c08
+GET https://roomkeepapi-ivory.vercel.app/v1/collections?statementId=7be0afd0-87aa-4fe5-81b8-93074128760c
 Authorization: Bearer <accessToken>
 ```
 Response:
@@ -2972,26 +2972,26 @@ Response:
 {
   "data": [
     {
-      "id": "edf8dce7-d6de-49fb-adbf-8460fdb41c83",
-      "statementId": "79a2295e-6406-4771-ac90-66bfeaf29c08",
+      "id": "2b8a348b-49eb-4e5a-a121-1667759136f3",
+      "statementId": "7be0afd0-87aa-4fe5-81b8-93074128760c",
       "amount": 1042000,
       "paidAt": "2026-11-10",
       "methodNote": "Chuyển khoản",
       "isDemo": false,
       "rev": 18,
-      "createdAt": "2026-11-14T19:03:09Z",
-      "updatedAt": "2026-11-14T19:03:09Z"
+      "createdAt": "2026-11-14T19:18:21Z",
+      "updatedAt": "2026-11-14T19:18:21Z"
     },
     {
-      "id": "01a338b4-7765-448a-a51b-f994462175b3",
-      "statementId": "79a2295e-6406-4771-ac90-66bfeaf29c08",
+      "id": "bfeae71f-83fd-497b-9e88-0b6f39d4834e",
+      "statementId": "7be0afd0-87aa-4fe5-81b8-93074128760c",
       "amount": 2000000,
       "paidAt": "2026-11-05",
       "methodNote": "Tiền mặt",
       "isDemo": false,
       "rev": 15,
-      "createdAt": "2026-11-14T19:03:09Z",
-      "updatedAt": "2026-11-14T19:03:09Z"
+      "createdAt": "2026-11-14T19:18:21Z",
+      "updatedAt": "2026-11-14T19:18:21Z"
     }
   ],
   "page": {
@@ -3004,11 +3004,11 @@ Response:
 
 #### Sổ cọc của một hợp đồng
 
-`GET /v1/deposit-entries?contractId=81f73e3e-620d-4dea-b408-98c4684ca86a` → **200**
+`GET /v1/deposit-entries?contractId=a057fa17-62b2-4332-81b9-9b805a32c044` → **200**
 
 Request:
 ```http
-GET https://roomkeepapi-ivory.vercel.app/v1/deposit-entries?contractId=81f73e3e-620d-4dea-b408-98c4684ca86a
+GET https://roomkeepapi-ivory.vercel.app/v1/deposit-entries?contractId=a057fa17-62b2-4332-81b9-9b805a32c044
 Authorization: Bearer <accessToken>
 ```
 Response:
@@ -3016,16 +3016,16 @@ Response:
 {
   "data": [
     {
-      "id": "be8b5e21-501a-45d9-b97d-414cb1f48e82",
-      "contractId": "81f73e3e-620d-4dea-b408-98c4684ca86a",
+      "id": "c080d540-448b-4be1-a99d-779720a4202c",
+      "contractId": "a057fa17-62b2-4332-81b9-9b805a32c044",
       "type": "receive",
       "amount": 2500000,
       "date": "2026-11-01",
       "reason": "Nhận cọc khi ký hợp đồng",
       "isDemo": false,
       "rev": 19,
-      "createdAt": "2026-11-14T19:03:09Z",
-      "updatedAt": "2026-11-14T19:03:09Z"
+      "createdAt": "2026-11-14T19:18:21Z",
+      "updatedAt": "2026-11-14T19:18:21Z"
     }
   ],
   "page": {
@@ -3058,7 +3058,7 @@ Content-Type: application/json
 Response:
 ```json
 {
-  "id": "e5a2a360-3ecf-4b84-bf6b-54d05e58855c",
+  "id": "b2c73bca-c911-41cf-92f5-2be12c614342",
   "category": "Điện tổng",
   "amount": 3650000,
   "date": "2026-11-03",
@@ -3066,8 +3066,8 @@ Response:
   "note": "Hóa đơn EVN tháng 10",
   "isDemo": false,
   "rev": 20,
-  "createdAt": "2026-11-14T19:03:09Z",
-  "updatedAt": "2026-11-14T19:03:09Z"
+  "createdAt": "2026-11-14T19:18:21Z",
+  "updatedAt": "2026-11-14T19:18:21Z"
 }
 ```
 
@@ -3085,7 +3085,7 @@ Response:
 {
   "data": [
     {
-      "id": "90793393-1c4a-4cd7-9e68-7b17259bbcbc",
+      "id": "14545c3c-f7a0-4b16-8fa7-03f557cdb1cc",
       "category": "Sửa chữa",
       "amount": 350000,
       "date": "2026-11-08",
@@ -3093,11 +3093,11 @@ Response:
       "note": "Nạp gas máy lạnh A201",
       "isDemo": false,
       "rev": 23,
-      "createdAt": "2026-11-14T19:03:09Z",
-      "updatedAt": "2026-11-14T19:03:09Z"
+      "createdAt": "2026-11-14T19:18:21Z",
+      "updatedAt": "2026-11-14T19:18:21Z"
     },
     {
-      "id": "e5a2a360-3ecf-4b84-bf6b-54d05e58855c",
+      "id": "b2c73bca-c911-41cf-92f5-2be12c614342",
       "category": "Điện tổng",
       "amount": 3650000,
       "date": "2026-11-03",
@@ -3105,11 +3105,11 @@ Response:
       "note": "Hóa đơn EVN tháng 10",
       "isDemo": false,
       "rev": 20,
-      "createdAt": "2026-11-14T19:03:09Z",
-      "updatedAt": "2026-11-14T19:03:09Z"
+      "createdAt": "2026-11-14T19:18:21Z",
+      "updatedAt": "2026-11-14T19:18:21Z"
     },
     {
-      "id": "ac91a672-8693-4ca2-b21f-1b0fe722caac",
+      "id": "206cdc54-50fe-4d9c-a8fe-c62b0b57d272",
       "category": "Nước tổng",
       "amount": 760000,
       "date": "2026-11-03",
@@ -3117,8 +3117,8 @@ Response:
       "note": "Hóa đơn nước tháng 10",
       "isDemo": false,
       "rev": 21,
-      "createdAt": "2026-11-14T19:03:09Z",
-      "updatedAt": "2026-11-14T19:03:09Z"
+      "createdAt": "2026-11-14T19:18:21Z",
+      "updatedAt": "2026-11-14T19:18:21Z"
     }
   ],
   "page": {
@@ -3144,26 +3144,26 @@ Response:
 {
   "data": [
     {
-      "id": "cb344b96-ba74-4704-99f9-1a7f065e1565",
+      "id": "7dc5db41-f970-49a9-8706-d88507189c79",
       "type": "in",
       "amount": 500000,
       "reason": "Cọc giữ chỗ A204",
       "date": "2026-11-12",
       "isDemo": false,
       "rev": 24,
-      "createdAt": "2026-11-14T19:03:09Z",
-      "updatedAt": "2026-11-14T19:03:09Z"
+      "createdAt": "2026-11-14T19:18:21Z",
+      "updatedAt": "2026-11-14T19:18:21Z"
     },
     {
-      "id": "29a5e126-6951-4d7f-a3a7-5e5aa0646826",
+      "id": "fbe7579d-542c-4a12-bf8a-e6b5153badea",
       "type": "out",
       "amount": 180000,
       "reason": "Mua bóng đèn hành lang",
       "date": "2026-11-07",
       "isDemo": false,
       "rev": 25,
-      "createdAt": "2026-11-14T19:03:09Z",
-      "updatedAt": "2026-11-14T19:03:09Z"
+      "createdAt": "2026-11-14T19:18:21Z",
+      "updatedAt": "2026-11-14T19:18:21Z"
     }
   ],
   "page": {
@@ -3188,15 +3188,15 @@ Response:
 {
   "data": [
     {
-      "id": "29a5e126-6951-4d7f-a3a7-5e5aa0646826",
+      "id": "fbe7579d-542c-4a12-bf8a-e6b5153badea",
       "type": "out",
       "amount": 180000,
       "reason": "Mua bóng đèn hành lang",
       "date": "2026-11-07",
       "isDemo": false,
       "rev": 25,
-      "createdAt": "2026-11-14T19:03:09Z",
-      "updatedAt": "2026-11-14T19:03:09Z"
+      "createdAt": "2026-11-14T19:18:21Z",
+      "updatedAt": "2026-11-14T19:18:21Z"
     }
   ],
   "page": {
@@ -3221,26 +3221,26 @@ Response:
 {
   "data": [
     {
-      "id": "459b0276-5d15-4445-b0f6-e8b2438af9e4",
+      "id": "94f093ea-80e3-4fcd-aa40-82d39a4f5bb5",
       "cycle": "2026-10",
       "kind": "electric",
       "totalAmount": 3650000,
       "totalUnits": 820,
       "isDemo": false,
       "rev": 26,
-      "createdAt": "2026-11-14T19:03:09Z",
-      "updatedAt": "2026-11-14T19:03:09Z"
+      "createdAt": "2026-11-14T19:18:21Z",
+      "updatedAt": "2026-11-14T19:18:21Z"
     },
     {
-      "id": "d515d20d-1e03-4421-bff5-90173a840a2e",
+      "id": "1dc8e29f-27a0-4ed6-8aa1-26b96e2eff9d",
       "cycle": "2026-10",
       "kind": "water",
       "totalAmount": 760000,
       "totalUnits": 33,
       "isDemo": false,
       "rev": 27,
-      "createdAt": "2026-11-14T19:03:09Z",
-      "updatedAt": "2026-11-14T19:03:09Z"
+      "createdAt": "2026-11-14T19:18:21Z",
+      "updatedAt": "2026-11-14T19:18:21Z"
     }
   ],
   "page": {
@@ -3265,26 +3265,26 @@ Response:
 {
   "data": [
     {
-      "id": "9f912141-0da0-4a48-ba37-93bc27aeb0d6",
+      "id": "af53021a-bf74-4763-aeec-e9726d08ec55",
       "type": "out",
       "amount": 650000,
       "date": "2026-11-10",
       "reason": "Thay khóa, sơn phòng A104",
       "isDemo": false,
       "rev": 29,
-      "createdAt": "2026-11-14T19:03:09Z",
-      "updatedAt": "2026-11-14T19:03:09Z"
+      "createdAt": "2026-11-14T19:18:21Z",
+      "updatedAt": "2026-11-14T19:18:21Z"
     },
     {
-      "id": "ebd0e968-98cc-47f9-8626-3c7db81dc939",
+      "id": "963947e9-4692-4eb1-a472-3c6f6fa5c873",
       "type": "in",
       "amount": 500000,
       "date": "2026-10-31",
       "reason": "Trích quỹ tháng 10",
       "isDemo": false,
       "rev": 28,
-      "createdAt": "2026-11-14T19:03:09Z",
-      "updatedAt": "2026-11-14T19:03:09Z"
+      "createdAt": "2026-11-14T19:18:21Z",
+      "updatedAt": "2026-11-14T19:18:21Z"
     }
   ],
   "page": {
@@ -3309,15 +3309,15 @@ Response:
 {
   "data": [
     {
-      "id": "5def56a3-e2d1-472b-9cc5-3367d49408e0",
-      "staffId": "f81f2dd0-1e17-4780-9e12-4807a5320df7",
+      "id": "b8fcc33d-74e1-4f60-bf6c-4269a4bf09ad",
+      "staffId": "72dfc4ee-c005-4636-92a6-eaa108e5d08c",
       "cycle": "2026-10",
       "amount": 1500000,
       "note": "Lương tháng 10",
       "isDemo": false,
       "rev": 31,
-      "createdAt": "2026-11-14T19:03:09Z",
-      "updatedAt": "2026-11-14T19:03:09Z"
+      "createdAt": "2026-11-14T19:18:21Z",
+      "updatedAt": "2026-11-14T19:18:21Z"
     }
   ],
   "page": {
@@ -3342,15 +3342,15 @@ Response:
 {
   "data": [
     {
-      "id": "f19f45dd-64c3-4bce-a698-ce15dbd4e92a",
+      "id": "37598395-fe6b-4e9d-95ad-4fbe338c4980",
       "roomId": null,
       "amount": 48000000,
       "date": "2025-01-01",
       "note": "Lắp 8 máy lạnh",
       "isDemo": false,
       "rev": 32,
-      "createdAt": "2026-11-14T19:03:09Z",
-      "updatedAt": "2026-11-14T19:03:09Z"
+      "createdAt": "2026-11-14T19:18:21Z",
+      "updatedAt": "2026-11-14T19:18:21Z"
     }
   ],
   "page": {
@@ -3375,13 +3375,13 @@ Response:
 {
   "data": [
     {
-      "id": "a44194d2-b399-44ed-bb41-4dde93e21ed8",
+      "id": "b78e5568-e105-4ce1-a2ba-1809b9f513f0",
       "month": "2026-11",
       "targetRevenue": 20000000,
       "isDemo": false,
       "rev": 33,
-      "createdAt": "2026-11-14T19:03:09Z",
-      "updatedAt": "2026-11-14T19:03:09Z"
+      "createdAt": "2026-11-14T19:18:21Z",
+      "updatedAt": "2026-11-14T19:18:21Z"
     }
   ],
   "page": {
@@ -3406,7 +3406,7 @@ Response:
 {
   "code": "forbidden",
   "message": "Bạn không có quyền thực hiện thao tác này",
-  "requestId": "req_07e5c9a8a571"
+  "requestId": "req_0cd894666acc"
 }
 ```
 
@@ -3421,7 +3421,7 @@ Response:
 {
   "code": "unauthorized",
   "message": "Bạn cần đăng nhập để tiếp tục",
-  "requestId": "req_ed2e48360a56"
+  "requestId": "req_56d91293c1e4"
 }
 ```
 
@@ -3439,7 +3439,7 @@ Response:
 {
   "code": "token_expired",
   "message": "Phiên truy cập đã hết hạn",
-  "requestId": "req_a4c26b537d1f"
+  "requestId": "req_b07b614ffa3b"
 }
 ```
 
@@ -3462,7 +3462,7 @@ Response:
 {
   "code": "refresh_invalid",
   "message": "Không thể làm mới phiên, vui lòng đăng nhập lại",
-  "requestId": "req_b15e18d5e01f"
+  "requestId": "req_8a1576cd19c4"
 }
 ```
 * Gửi lại một refresh token cũ (đã đổi) thì `code` là `refresh_reused` và cả phiên bị thu hồi; xử lý giống nhau: về màn hình đăng nhập, giữ dữ liệu trên máy.
@@ -3487,7 +3487,7 @@ Response:
 {
   "code": "invalid_credentials",
   "message": "Email/số điện thoại hoặc mật khẩu không đúng",
-  "requestId": "req_add7678bf891"
+  "requestId": "req_33ec9152cebb"
 }
 ```
 
@@ -3532,7 +3532,7 @@ Response:
       "code": "required"
     }
   ],
-  "requestId": "req_2ed5e71b8d57"
+  "requestId": "req_fdab794228a5"
 }
 ```
 * `fields` có 5 phần tử, chỉ hiện 3 phần tử đầu.
@@ -3572,7 +3572,7 @@ Response:
       "code": "phone_taken"
     }
   ],
-  "requestId": "req_6e102f75ea45"
+  "requestId": "req_edbb70586e9d"
 }
 ```
 
@@ -3604,7 +3604,7 @@ Response:
 {
   "code": "email_taken",
   "message": "Email này đã được đăng ký",
-  "requestId": "req_cfd5439e1ef1"
+  "requestId": "req_4deb1d77fdc3"
 }
 ```
 
@@ -3641,10 +3641,10 @@ Response:
     "note": "Sửa trần",
     "isDemo": false,
     "rev": 9,
-    "createdAt": "2026-11-14T19:03:09Z",
-    "updatedAt": "2026-11-14T19:03:09Z"
+    "createdAt": "2026-11-14T19:18:21Z",
+    "updatedAt": "2026-11-14T19:18:21Z"
   },
-  "requestId": "req_56ff4fe040d6"
+  "requestId": "req_00e4c3d5f42e"
 }
 ```
 
@@ -3674,7 +3674,7 @@ Response:
       "count": 1
     }
   ],
-  "requestId": "req_43525df21b72"
+  "requestId": "req_6b888fe81d3d"
 }
 ```
 
@@ -3692,7 +3692,7 @@ Response:
 {
   "code": "not_found",
   "message": "Không tìm thấy",
-  "requestId": "req_19d130688ac9"
+  "requestId": "req_7921ed92ebf3"
 }
 ```
 
@@ -3713,7 +3713,7 @@ Response:
   "message": "Phiên bản ứng dụng quá cũ, vui lòng cập nhật",
   "minAppVersion": "1.0.0",
   "latestAppVersion": "1.0.0",
-  "requestId": "req_359571f1aacf"
+  "requestId": "req_5ce6faf0cd3d"
 }
 ```
 
