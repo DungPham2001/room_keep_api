@@ -7,9 +7,9 @@ const express = require('express');
 const config = require('../config');
 const { langOf } = require('../i18n');
 
-const OWNER = process.env.PRIVACY_OWNER || 'Pham Dung';
-const EMAIL = process.env.PRIVACY_EMAIL || '2631phamvandung@gmail.com';
-const UPDATED = '2026-11-15';
+const OWNER = process.env.PRIVACY_OWNER || 'TMSC Developer';
+const EMAIL = process.env.PRIVACY_EMAIL || 'support@tmsc-vn.com';
+const UPDATED = '2026-11-16';
 
 const esc = (s) => String(s).replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
 
@@ -20,7 +20,7 @@ const mail = `<a href="mailto:${esc(EMAIL)}">${esc(EMAIL)}</a>`;
 const content = {
   vi: {
     title: 'Chính sách quyền riêng tư RoomKeep',
-    updated: `Cập nhật lần cuối: 15/11/2026`,
+    updated: `Cập nhật lần cuối: 16/11/2026`,
     other: '<a href="?lang=en">English</a>',
     sections: [
       ['Chúng tôi là ai', [
@@ -80,7 +80,7 @@ const content = {
     other: '<a href="?lang=vi">Tiếng Việt</a>',
     sections: [
       ['Who we are', [
-        `RoomKeep is a rental-property management app developed by <strong>${esc(OWNER)}</strong>, who is responsible for the data. Contact: ${mail}.`,
+        `RoomKeep is a rental-property management app developed by <strong>${esc(OWNER)}</strong>, which is responsible for the data. Contact: ${mail}.`,
       ]],
       ['Two ways to use the app', [
         '<strong>Without an account:</strong> all data stays on your phone and is never sent to our server.',

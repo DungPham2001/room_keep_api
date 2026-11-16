@@ -358,8 +358,9 @@ test('privacy policy page (vi default, en), with owner, contact and deletion lin
   const vi = await request(app).get('/privacy').expect(200);
   assert.match(vi.headers['content-type'], /html/);
   assert.match(vi.text, /Chính sách quyền riêng tư RoomKeep/);
-  assert.match(vi.text, /Pham Dung/);
-  assert.match(vi.text, /mailto:2631phamvandung@gmail.com/);
+  assert.match(vi.text, /TMSC Developer/);
+  assert.match(vi.text, /mailto:support@tmsc-vn.com/);
+  assert.doesNotMatch(vi.text, /Pham Dung|2631phamvandung/);
   assert.match(vi.text, /\/account\/delete/);
   const en = await request(app).get('/privacy?lang=en').expect(200);
   assert.match(en.text, /RoomKeep Privacy Policy/);
